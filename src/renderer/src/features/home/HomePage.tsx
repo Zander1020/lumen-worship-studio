@@ -66,6 +66,29 @@ export function HomePage({ app }: HomePageProps) {
     const files = Array.from(e.target.files ?? [])
     for (const file of files) {
       const lower = file.name.toLowerCase()
+      const nativePath =
+        (file as unknown as { path?: string }).path ||
+        (typeof window !== 'undefined' &&
+          (window as unknown as { lumen?: { getPathForFile?: (f: File) => string } }).lumen?.getPathForFile?.(file))
+
+      let fileData: string | undefined = undefined
+      if (!nativePath) {
+        try {
+          fileData = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => {
+              const res = (reader.result as string) || ''
+              const comma = res.indexOf(',')
+              resolve(comma !== -1 ? res.slice(comma + 1) : res)
+            }
+            reader.onerror = reject
+            reader.readAsDataURL(file)
+          })
+        } catch {
+          // ignore
+        }
+      }
+
       if (lower.endsWith('.pdf')) {
         try {
           const deck = await convertPdfToSlides(file, file.name)
@@ -75,6 +98,8 @@ export function HomePage({ app }: HomePageProps) {
               title: deck.title,
               subtitle: `${deck.slides.length} páginas · PDF`,
               kind: 'pdf',
+              filePath: nativePath || undefined,
+              fileData,
               slides: deck.slides
             })
             setOpenDocTabs((prev) => [...prev.filter((d) => d.title !== deck.title), { id: `doc-${Date.now()}`, title: deck.title, slides: deck.slides }])
@@ -105,6 +130,8 @@ export function HomePage({ app }: HomePageProps) {
               title: deck.title,
               subtitle: `${deck.slides.length} diapositivas · PowerPoint`,
               kind: 'pptx',
+              filePath: nativePath || undefined,
+              fileData,
               slides: deck.slides
             })
             setOpenDocTabs((prev) => [...prev.filter((d) => d.title !== deck.title), { id: `doc-${Date.now()}`, title: deck.title, slides: deck.slides }])
@@ -294,7 +321,7 @@ export function HomePage({ app }: HomePageProps) {
     setOpenDocTabs((prev) => prev.filter((d) => d.id !== tabId && d.title !== tabId))
   }
 
-  // Recopilar presentaciones disponibles (almacén persistente de diapositivas, pestañas abiertas y cronograma)
+  // Recopilar presentaciones disponibles (almacén persistente de diapositivas)
   const presentationDecks = useMemo(() => {
     const list: Array<{ id: string; title: string; subtitle: string; slides: PresentationSlide[]; kind: 'pdf' | 'pptx' }> = []
     const seenTitles = new Set<string>()
@@ -314,47 +341,8 @@ export function HomePage({ app }: HomePageProps) {
       }
     })
 
-    // 2. Pestañas abiertas en la sesión
-    openDocTabs.forEach((d) => {
-      const lower = d.title.toLowerCase()
-      if (!seenTitles.has(lower)) {
-        seenTitles.add(lower)
-        const isPdf = lower.includes('.pdf') || lower.includes('pdf')
-        list.push({
-          id: d.id,
-          title: d.title,
-          subtitle: `${d.slides.length} diapositivas / páginas`,
-          slides: d.slides,
-          kind: isPdf ? 'pdf' : 'pptx'
-        })
-      }
-    })
-
-    // 3. Cronograma (Schedule)
-    app.schedule.forEach((s) => {
-      if (s.slides && s.slides.length > 0) {
-        const cleanTitle = s.title.replace(/^(PDF|PowerPoint):\s*/i, '').trim()
-        const lower = cleanTitle.toLowerCase()
-        const isDoc =
-          s.title.toLowerCase().startsWith('pdf:') ||
-          s.title.toLowerCase().startsWith('powerpoint:') ||
-          s.slides.some((sl) => sl.label.toLowerCase().includes('página') || sl.label.toLowerCase().includes('diapositiva'))
-        if (isDoc && !seenTitles.has(lower)) {
-          seenTitles.add(lower)
-          const isPdf = s.title.toLowerCase().includes('pdf')
-          list.push({
-            id: s.id,
-            title: cleanTitle,
-            subtitle: `${s.slides.length} diapositivas / páginas`,
-            slides: s.slides,
-            kind: isPdf ? 'pdf' : 'pptx'
-          })
-        }
-      }
-    })
-
     return list
-  }, [app.presentations, openDocTabs, app.schedule])
+  }, [app.presentations])
 
   const filteredPresentations = useMemo(() => {
     const q = presentationSearch.trim().toLowerCase()
@@ -797,13 +785,79 @@ export function HomePage({ app }: HomePageProps) {
                   <button
                     type="button"
                     className="hly-mini-btn"
-                    title="Recargar diapositivas desde el almacenamiento local"
+                    title="Recargar diapositivas desde la carpeta física"
+                    aria-label="Recargar diapositivas desde la carpeta física"
+                    disabled={isReloadingSlides}
                     onClick={async () => {
                       setIsReloadingSlides(true)
                       try {
-                        await app.reloadSlides()
+                        // 1. Recargar y sincronizar presentaciones con los archivos de la carpeta
+                        const updated = (await app.reloadSlides?.()) || []
+                        const validTitles = new Set(updated.map((p) => p.title.toLowerCase()))
+
+                        // Cerrar pestañas abiertas de documentos que ya no existen
+                        setOpenDocTabs((prev) =>
+                          prev.filter((d) => validTitles.has(d.title.toLowerCase()))
+                        )
+                        if (
+                          selectedDocId &&
+                          !validTitles.has(selectedDocId.toLowerCase()) &&
+                          !updated.some((p) => p.id === selectedDocId)
+                        ) {
+                          setSelectedDocId(null)
+                        }
+
+                        // 2. Escanear la carpeta de diapositivas en busca de nuevos archivos PDF/PowerPoint
+                        if (typeof app.scanSlidesFolder === 'function') {
+                          const folderFiles = await app.scanSlidesFolder()
+                          const existingTitles = new Set(
+                            updated.map((p) => p.title.toLowerCase())
+                          )
+
+                          for (const fileInfo of folderFiles) {
+                            const cleanName = fileInfo.fileName.replace(/\.[^/.]+$/, '')
+                            if (!existingTitles.has(cleanName.toLowerCase())) {
+                              try {
+                                const fileUrl = `lumen-media://local/${encodeURIComponent(fileInfo.filePath.replace(/\\/g, '/'))}`
+                                const res = await fetch(fileUrl)
+                                if (res.ok) {
+                                  const arrayBuf = await res.arrayBuffer()
+                                  if (fileInfo.ext === 'pdf') {
+                                    const deck = await convertPdfToSlides(arrayBuf, fileInfo.fileName)
+                                    if (deck.slides.length > 0) {
+                                      await app.savePresentation({
+                                        id: `pdf-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                                        title: deck.title,
+                                        subtitle: `${deck.slides.length} páginas · PDF`,
+                                        kind: 'pdf',
+                                        filePath: fileInfo.filePath,
+                                        slides: deck.slides
+                                      })
+                                      existingTitles.add(cleanName.toLowerCase())
+                                    }
+                                  } else {
+                                    const deck = await convertPptxToSlides(arrayBuf, fileInfo.fileName)
+                                    if (deck.slides.length > 0) {
+                                      await app.savePresentation({
+                                        id: `pptx-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                                        title: deck.title,
+                                        subtitle: `${deck.slides.length} diapositivas · PowerPoint`,
+                                        kind: 'pptx',
+                                        filePath: fileInfo.filePath,
+                                        slides: deck.slides
+                                      })
+                                      existingTitles.add(cleanName.toLowerCase())
+                                    }
+                                  }
+                                }
+                              } catch (err) {
+                                console.warn('[Slides] Error al auto-procesar archivo de carpeta:', fileInfo.fileName, err)
+                              }
+                            }
+                          }
+                        }
                       } finally {
-                        setIsReloadingSlides(false)
+                        setTimeout(() => setIsReloadingSlides(false), 300)
                       }
                     }}
                   >

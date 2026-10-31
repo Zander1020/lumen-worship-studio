@@ -86,9 +86,10 @@ export interface PresentationDeck {
   title: string
   subtitle: string
   kind: 'pdf' | 'pptx'
-  filePath?: string
+  filePath?: string | undefined
+  fileData?: string | undefined
   slides: PresentationSlide[]
-  createdAt?: number
+  createdAt?: number | undefined
 }
 
 export interface MediaBackgroundInput {

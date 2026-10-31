@@ -75,6 +75,7 @@ export interface LumenApi {
   readonly deletePresentation?: (id: string) => Promise<PresentationDeck[]>
   readonly openSlidesFolder?: () => Promise<string>
   readonly reloadSlides?: () => Promise<PresentationDeck[]>
+  readonly scanSlidesFolder?: () => Promise<Array<{ fileName: string; filePath: string; ext: string }>>
 
   /** Control remoto móvil en red local */
   readonly getRemoteInfo: () => Promise<RemoteServerInfo>

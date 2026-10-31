@@ -93,6 +93,8 @@ const api: LumenApi = {
     ipcRenderer.invoke(IpcChannels.slidesDelete, { id }) as Promise<PresentationDeck[]>,
   openSlidesFolder: () => ipcRenderer.invoke(IpcChannels.slidesOpenFolder) as Promise<string>,
   reloadSlides: () => ipcRenderer.invoke(IpcChannels.slidesReload) as Promise<PresentationDeck[]>,
+  scanSlidesFolder: () =>
+    ipcRenderer.invoke(IpcChannels.slidesScanFolder) as Promise<Array<{ fileName: string; filePath: string; ext: string }>>,
   openExternalUrl: (url: string) => ipcRenderer.invoke(IpcChannels.appOpenExternal, url) as Promise<boolean>,
   getPathForFile: (file: File) => {
     try {

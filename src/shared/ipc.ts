@@ -84,6 +84,7 @@ export const IpcChannels = {
   slidesDelete: 'slides:delete',
   slidesOpenFolder: 'slides:open-folder',
   slidesReload: 'slides:reload',
+  slidesScanFolder: 'slides:scan-folder',
 
   /** Enlaces externos (WhatsApp, mailto) */
   appOpenExternal: 'app:open-external',

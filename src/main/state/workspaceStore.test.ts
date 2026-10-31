@@ -81,4 +81,63 @@ describe('WorkspaceStore', () => {
     const updatedSettings = store.updateSettings({ churchName: 'Iglesia Luz Viva' })
     expect(updatedSettings.churchName).toBe('Iglesia Luz Viva')
   })
+
+  it('sincroniza presentaciones con la carpeta de diapositivas y purga elementos huérfanos al recargar', async () => {
+    const { mkdtempSync, writeFileSync, rmSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+
+    const tempDir = mkdtempSync(join(tmpdir(), 'lumen-test-'))
+    const workspaceJson = join(tempDir, 'workspace.json')
+
+    try {
+      const store = new WorkspaceStore(workspaceJson)
+
+      // Guardar una presentación huérfana (sin archivo físico)
+      store.savePresentation({
+        id: 'orphan-1',
+        title: 'Presentación Huérfana',
+        subtitle: '1 diapositiva',
+        kind: 'pptx',
+        slides: [{ id: 's1', label: 'Diapositiva 1', content: 'Prueba', lines: ['Prueba'] }]
+      })
+
+      expect(store.listPresentations().length).toBe(1)
+
+      // Al recargar cuando la carpeta diapositivas está vacía, debe purgarse
+      const reloaded = store.reloadSlides()
+      expect(reloaded.length).toBe(0)
+      expect(store.listPresentations().length).toBe(0)
+
+      // Ahora colocamos un archivo real en la carpeta diapositivas
+      const slidesDir = join(tempDir, 'diapositivas')
+      const realPptx = join(slidesDir, 'Tema Domingo.pptx')
+      writeFileSync(realPptx, 'dummy pptx content')
+
+      // Guardamos la presentación asociada a ese archivo
+      store.savePresentation({
+        id: 'real-1',
+        title: 'Tema Domingo',
+        subtitle: '1 diapositiva',
+        kind: 'pptx',
+        filePath: realPptx,
+        slides: [{ id: 's1', label: 'Diapositiva 1', content: 'Contenido', lines: ['Contenido'] }]
+      })
+
+      expect(store.listPresentations().length).toBe(1)
+
+      // Al recargar, como el archivo existe físicamente, se preserva
+      const reloaded2 = store.reloadSlides()
+      expect(reloaded2.length).toBe(1)
+      expect(reloaded2[0]?.title).toBe('Tema Domingo')
+
+      // Al eliminar, debe borrar el archivo físico
+      store.deletePresentation('real-1')
+      expect(store.listPresentations().length).toBe(0)
+      const { existsSync } = await import('node:fs')
+      expect(existsSync(realPptx)).toBe(false)
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true })
+    }
+  })
 })

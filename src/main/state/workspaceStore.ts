@@ -1,6 +1,6 @@
-import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, writeFileSync } from 'node:fs'
+import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { basename, dirname, extname, join } from 'node:path'
+import { basename, dirname, extname, join, resolve } from 'node:path'
 import { parseHolyricsCatalogPayload, parseHolyricsMufl } from '../../shared/holyricsCompat'
 import type {
   AiSuggestionResult,
@@ -190,6 +190,9 @@ export class WorkspaceStore {
 
     this.reloadMedia()
     this.reloadBackgrounds()
+    if (this.syncPresentationsWithDisk()) {
+      this.saveToDisk()
+    }
 
     // Auto-cargar catálogo .mufl si está disponible y la base de datos sólo tiene las 5 canciones por defecto
     if (this.songs.length <= 5) {
@@ -719,6 +722,44 @@ export class WorkspaceStore {
   }
 
   savePresentation(deck: PresentationDeck): PresentationDeck[] {
+    if (this.slidesDir && !existsSync(this.slidesDir)) {
+      try {
+        mkdirSync(this.slidesDir, { recursive: true })
+      } catch {
+        // ignore
+      }
+    }
+
+    if (this.slidesDir) {
+      // 1. Si viene con fileData (base64) y no existe el archivo en slidesDir, guardarlo
+      if (deck.fileData) {
+        try {
+          const ext = deck.kind === 'pdf' ? '.pdf' : '.pptx'
+          const fileName = deck.title.toLowerCase().endsWith(ext) ? deck.title : `${deck.title}${ext}`
+          const safeName = fileName.replace(/[<>:"/\\|?*]/g, '_')
+          const destPath = join(this.slidesDir, safeName)
+          writeFileSync(destPath, Buffer.from(deck.fileData, 'base64'))
+          deck.filePath = destPath
+          delete deck.fileData
+        } catch (err) {
+          console.warn('[WorkspaceStore] Error guardando fileData en slidesDir:', err)
+        }
+      }
+
+      // 2. Si viene con filePath externo, copiar el archivo a slidesDir
+      if (deck.filePath && existsSync(deck.filePath)) {
+        try {
+          const destPath = join(this.slidesDir, basename(deck.filePath))
+          if (resolve(deck.filePath) !== resolve(destPath)) {
+            copyFileSync(deck.filePath, destPath)
+          }
+          deck.filePath = destPath
+        } catch (err) {
+          console.warn('[WorkspaceStore] Error copiando archivo a slidesDir:', err)
+        }
+      }
+    }
+
     const existingIdx = this.presentations.findIndex(
       (p) => p.id === deck.id || p.title.toLowerCase() === deck.title.toLowerCase()
     )
@@ -733,6 +774,41 @@ export class WorkspaceStore {
 
   deletePresentation(id: string): PresentationDeck[] {
     const lower = id.toLowerCase()
+    const target = this.presentations.find(
+      (p) => p.id === id || p.title.toLowerCase() === lower
+    )
+    if (target) {
+      // 1. Borrar archivo físico si target.filePath apunta a disco
+      if (target.filePath && existsSync(target.filePath)) {
+        try {
+          unlinkSync(target.filePath)
+        } catch (err) {
+          console.warn('[WorkspaceStore] Error al borrar archivo de diapositiva:', err)
+        }
+      }
+      // 2. Si no tenía filePath o ya no está en esa ruta, comprobar si hay archivo en slidesDir con ese título
+      if (this.slidesDir && existsSync(this.slidesDir)) {
+        try {
+          const files = readdirSync(this.slidesDir)
+          const cleanTitle = target.title.replace(/\.[^/.]+$/, '').toLowerCase().trim()
+          for (const file of files) {
+            const base = basename(file, extname(file)).toLowerCase().trim()
+            if (base === cleanTitle || file.toLowerCase() === cleanTitle) {
+              const fullP = join(this.slidesDir, file)
+              if (existsSync(fullP)) {
+                try {
+                  unlinkSync(fullP)
+                } catch {
+                  // ignore
+                }
+              }
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
     this.presentations = this.presentations.filter(
       (p) => p.id !== id && p.title.toLowerCase() !== lower
     )
@@ -740,12 +816,87 @@ export class WorkspaceStore {
     return this.listPresentations()
   }
 
+  private syncPresentationsWithDisk(): boolean {
+    if (!this.slidesDir || !existsSync(this.slidesDir)) return false
+    try {
+      const rawFiles = readdirSync(this.slidesDir)
+      const diskFileNames = new Set(rawFiles.map((f) => f.toLowerCase()))
+      let changed = false
+
+      this.presentations = this.presentations.filter((p) => {
+        // 1. Si la presentación tiene ruta física
+        if (p.filePath) {
+          const fileName = basename(p.filePath).toLowerCase()
+          const exists = diskFileNames.has(fileName) || existsSync(p.filePath)
+          if (!exists) {
+            changed = true
+            return false
+          }
+          // Si el archivo está en slidesDir, asegurar que apunte a la ruta dentro de slidesDir
+          const inSlidesDir = join(this.slidesDir, basename(p.filePath))
+          if (existsSync(inSlidesDir) && p.filePath !== inSlidesDir) {
+            p.filePath = inSlidesDir
+            changed = true
+          }
+          return true
+        }
+
+        // 2. Si no tiene filePath (legacy / huérfano):
+        // Comprobar si existe un archivo físico en diapositivas/ con coincidencia de título
+        const cleanTitle = p.title.replace(/\.[^/.]+$/, '').toLowerCase().trim()
+        const matchedFile = rawFiles.find((f) => {
+          const base = basename(f, extname(f)).toLowerCase().trim()
+          return base === cleanTitle || f.toLowerCase() === cleanTitle
+        })
+
+        if (matchedFile) {
+          p.filePath = join(this.slidesDir, matchedFile)
+          changed = true
+          return true
+        }
+
+        // Si la carpeta de diapositivas no contiene ningún archivo para esta presentación,
+        // se elimina porque no existe físicamente en disco.
+        changed = true
+        return false
+      })
+
+      return changed
+    } catch {
+      return false
+    }
+  }
+
   reloadSlides(): PresentationDeck[] {
     const loaded = this.loadFromDisk()
     if (loaded && Array.isArray(loaded.presentations)) {
       this.presentations = loaded.presentations
     }
+    if (this.syncPresentationsWithDisk()) {
+      this.saveToDisk()
+    }
     return this.listPresentations()
+  }
+
+  scanSlidesFolderFiles(): Array<{ fileName: string; filePath: string; ext: string }> {
+    if (!this.slidesDir || !existsSync(this.slidesDir)) return []
+    try {
+      const files = readdirSync(this.slidesDir)
+      const results: Array<{ fileName: string; filePath: string; ext: string }> = []
+      for (const file of files) {
+        const ext = extname(file).replace(/^\./, '').toLowerCase()
+        if (['pdf', 'pptx', 'ppt', 'ppsx', 'pps', 'potx'].includes(ext)) {
+          results.push({
+            fileName: file,
+            filePath: join(this.slidesDir, file),
+            ext
+          })
+        }
+      }
+      return results
+    } catch {
+      return []
+    }
   }
 
   // --- Asistente inteligente local (sin conexión externa) ---

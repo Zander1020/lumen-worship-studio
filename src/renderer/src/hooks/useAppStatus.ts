@@ -72,7 +72,8 @@ export interface UseAppStatus {
   savePresentation: (deck: PresentationDeck) => Promise<void>
   deletePresentation: (id: string) => Promise<void>
   openSlidesFolder: () => Promise<void>
-  reloadSlides: () => Promise<void>
+  reloadSlides: () => Promise<PresentationDeck[]>
+  scanSlidesFolder?: () => Promise<Array<{ fileName: string; filePath: string; ext: string }>>
 
   startRemoteServer: () => Promise<void>
   stopRemoteServer: () => Promise<void>
@@ -485,17 +486,33 @@ export function useAppStatus(): UseAppStatus {
     }
   }, [api])
 
-  const reloadSlides = useCallback(async () => {
-    if (!api) return
+  const reloadSlides = useCallback(async (): Promise<PresentationDeck[]> => {
+    if (!api) return []
     try {
       if (typeof api.reloadSlides === 'function') {
-        setPresentations(await api.reloadSlides())
+        const reloaded = await api.reloadSlides()
+        setPresentations(reloaded)
         setNotice('Diapositivas actualizadas.')
+        return reloaded
       } else if (typeof api.listPresentations === 'function') {
-        setPresentations(await api.listPresentations())
+        const list = await api.listPresentations()
+        setPresentations(list)
+        return list
       }
+      return []
     } catch (err: unknown) {
       setError(messageOf(err))
+      return []
+    }
+  }, [api])
+
+  const scanSlidesFolder = useCallback(async () => {
+    if (!api || typeof api.scanSlidesFolder !== 'function') return []
+    try {
+      return await api.scanSlidesFolder()
+    } catch (err: unknown) {
+      setError(messageOf(err))
+      return []
     }
   }, [api])
 
@@ -610,6 +627,7 @@ export function useAppStatus(): UseAppStatus {
     deletePresentation,
     openSlidesFolder,
     reloadSlides,
+    scanSlidesFolder,
     startRemoteServer,
     stopRemoteServer,
     regenerateRemotePin,
