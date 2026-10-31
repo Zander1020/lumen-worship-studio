@@ -93,13 +93,6 @@ export function Sidebar({ active, onSelect, app }: SidebarProps) {
   return (
     <header className="hly-topbar">
       <div className="hly-topbar__main">
-        <div className="sidebar__brand">
-          <span className="sidebar__logo" aria-hidden="true">
-            ✺
-          </span>
-          <span className="sidebar__title">LUMEN</span>
-        </div>
-
         <nav className="sidebar" aria-label="Secciones principales">
           <ul className="sidebar__list sidebar__list--primary">
             {primarySections.map((section) => (

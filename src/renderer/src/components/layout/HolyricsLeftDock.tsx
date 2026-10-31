@@ -92,11 +92,6 @@ export function HolyricsLeftDock({ app }: HolyricsLeftDockProps) {
         mediaVal = `data:video/mp4;base64,${mediaVal.slice(comma + 1)}`
       }
     }
-    const cleanItem: MediaBackground = {
-      ...item,
-      kind: isVideo ? 'video' : item.kind,
-      value: mediaVal
-    }
     void app.loadProjectionDeck({
       deckTitle: item.name,
       slides: [
@@ -114,7 +109,6 @@ export function HolyricsLeftDock({ app }: HolyricsLeftDockProps) {
       openWindow
     })
     void app.updateProjectionTheme({
-      background: cleanItem,
       videoPlaying: true
     })
     void app.setProjectionMode('live')

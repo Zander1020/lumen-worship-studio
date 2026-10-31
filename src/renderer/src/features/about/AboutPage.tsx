@@ -1,6 +1,18 @@
+import { useEffect, useState } from 'react'
 import lumenLogo from '../../assets/lumen.png'
 
 export function AboutPage() {
+  const [version, setVersion] = useState<string>('0.1.3')
+
+  useEffect(() => {
+    if (window.lumen?.getAppInfo) {
+      window.lumen.getAppInfo().then((info) => {
+        if (info?.version) {
+          setVersion(info.version)
+        }
+      }).catch(() => undefined)
+    }
+  }, [])
   const handleOpenExternal = (url: string): void => {
     if (window.lumen?.openExternalUrl) {
       void window.lumen.openExternalUrl(url)
@@ -55,7 +67,7 @@ export function AboutPage() {
                 Lumen Studio
               </h2>
               <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 600 }}>
-                Versión 1.0.0 Pro · Edición para Iglesias y Ministerios
+                Versión {version} · Edición para Iglesias y Ministerios
               </span>
             </div>
           </div>

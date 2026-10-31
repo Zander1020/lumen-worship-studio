@@ -67,7 +67,6 @@ export function MediaPage({ app }: MediaPageProps) {
       openWindow
     })
     void app.updateProjectionTheme({
-      background: img,
       videoPlaying: true
     })
     void app.setProjectionMode('live')
