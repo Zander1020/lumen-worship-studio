@@ -100,8 +100,10 @@ export interface PresentationSlide {
   /** Segunda columna opcional para comparación bilingüe / paralela. */
   parallelLines?: string[]
   parallelLabel?: string
-  /** Imagen a pantalla completa para anuncios/flyers del culto. */
+  /** Imagen o vídeo a pantalla completa para anuncios/flyers/videos del culto. */
   imageUrl?: string
+  /** Tipo de medio ('image' | 'video') cuando imageUrl está presente. */
+  mediaKind?: 'image' | 'video'
 }
 
 export type ScheduleItemKind = 'song' | 'bible' | 'announcement'

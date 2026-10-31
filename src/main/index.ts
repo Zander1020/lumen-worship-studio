@@ -1,4 +1,5 @@
 import { app, type BrowserWindow, Menu, net, protocol, screen, session } from 'electron'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { IpcChannels, type AppInfo } from '../shared/ipc'
@@ -86,6 +87,16 @@ function bootstrap(): void {
           let rawPath = decodeURIComponent(url.pathname)
           if (/^\/[a-zA-Z]:/.test(rawPath)) {
             rawPath = rawPath.slice(1)
+          }
+          // Si el archivo en disco no existe pero existe con extensión .mp4 o .png, resolverlo
+          if (!existsSync(rawPath)) {
+            if (existsSync(`${rawPath}.mp4`)) {
+              rawPath = `${rawPath}.mp4`
+            } else if (existsSync(`${rawPath}.webm`)) {
+              rawPath = `${rawPath}.webm`
+            } else if (existsSync(`${rawPath}.png`)) {
+              rawPath = `${rawPath}.png`
+            }
           }
           return net.fetch(pathToFileURL(rawPath).toString())
         } catch (e) {

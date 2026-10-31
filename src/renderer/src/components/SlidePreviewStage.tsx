@@ -584,7 +584,15 @@ export function SlidePreviewStage({
 
   const activeClock = clock ?? localClock
   const slideVideoRef = useRef<HTMLVideoElement | null>(null)
-  const isSlideVideo = Boolean(currentSlide?.imageUrl && isVideoUrl(currentSlide.imageUrl))
+  const isSlideVideo = Boolean(
+    currentSlide?.imageUrl &&
+      (currentSlide.mediaKind === 'video' ||
+        isVideoUrl(currentSlide.imageUrl) ||
+        currentSlide.label?.toLowerCase().includes('video') ||
+        currentSlide.label?.toLowerCase().includes('vídeo') ||
+        currentSlide.sourceTitle?.toLowerCase().includes('video') ||
+        currentSlide.sourceTitle?.toLowerCase().includes('vídeo'))
+  )
   const slideVideoSrc = isSlideVideo && currentSlide?.imageUrl ? resolveMediaVideoUrl(currentSlide.imageUrl) : ''
 
   const lastSlideRestartRef = useRef<number | undefined>(theme.videoRestartTime)

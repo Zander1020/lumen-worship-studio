@@ -1,5 +1,6 @@
 import { type ChangeEvent, type DragEvent, useMemo, useRef, useState } from 'react'
 import type { BackgroundKind, MediaBackground } from '../../../../shared/ipc'
+import { isVideoUrl } from '../../../../shared/slideHelpers'
 import { MotionVideoBackground } from '../../components/SlidePreviewStage'
 import type { UseAppStatus } from '../../hooks/useAppStatus'
 
@@ -50,6 +51,7 @@ export function MediaPage({ app }: MediaPageProps) {
   }
 
   const projectImageImmediately = (img: MediaBackground, openWindow = true): void => {
+    const isVid = img.kind === 'video' || isVideoUrl(img.value)
     void app.loadProjectionDeck({
       deckTitle: img.name,
       slides: [
@@ -60,7 +62,8 @@ export function MediaPage({ app }: MediaPageProps) {
           label: img.name,
           lines: [],
           footer: '',
-          imageUrl: img.value
+          imageUrl: img.value,
+          mediaKind: isVid ? 'video' : 'image'
         }
       ],
       startIndex: 0,
@@ -76,10 +79,11 @@ export function MediaPage({ app }: MediaPageProps) {
   }
 
   const addImageToSchedule = (img: MediaBackground): void => {
+    const isVid = img.kind === 'video' || isVideoUrl(img.value)
     void app.addScheduleItem({
       kind: 'announcement',
-      title: `Imagen: ${img.name}`,
-      subtitle: img.category || 'Imagen del Culto',
+      title: `${isVid ? 'Vídeo' : 'Imagen'}: ${img.name}`,
+      subtitle: img.category || (isVid ? 'Vídeo del Culto' : 'Imagen del Culto'),
       slides: [
         {
           id: `sched-img-${img.id}`,
@@ -88,7 +92,8 @@ export function MediaPage({ app }: MediaPageProps) {
           label: img.name,
           lines: [],
           footer: '',
-          imageUrl: img.value
+          imageUrl: img.value,
+          mediaKind: isVid ? 'video' : 'image'
         }
       ]
     })

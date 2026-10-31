@@ -1,6 +1,6 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, extname, join } from 'node:path'
 import { parseHolyricsCatalogPayload, parseHolyricsMufl } from '../../shared/holyricsCompat'
 import type {
   AiSuggestionResult,
@@ -90,8 +90,8 @@ export class WorkspaceStore {
             if (comma !== -1) {
               const rawB64 = item.value.slice(comma + 1)
               const ext = item.kind === 'video' ? '.mp4' : '.png'
-              const safeName = item.name.replace(/[^a-zA-Z0-9_\-.]/g, '_')
-              const fileName = safeName.includes('.') ? safeName : `${safeName}${ext}`
+              const safeName = item.name.replace(/[^a-zA-Z0-9_\-]/g, '_')
+              const fileName = `${safeName}${ext}`
               const targetPath = join(this.mediaDir, fileName)
               if (!existsSync(targetPath)) {
                 writeFileSync(targetPath, Buffer.from(rawB64, 'base64'))
@@ -105,6 +105,36 @@ export class WorkspaceStore {
         }
       }
       if (migrated) this.saveToDisk()
+    }
+
+    // Reparar posibles archivos huérfanos o sin extensión en media/
+    if (this.mediaDir && existsSync(this.mediaDir)) {
+      let repaired = false
+      for (const item of this.media) {
+        if (typeof item.value === 'string' && item.value.startsWith('lumen-media://local/')) {
+          try {
+            const rawUrl = new URL(item.value)
+            let filePath = decodeURIComponent(rawUrl.pathname)
+            if (/^\/[a-zA-Z]:/.test(filePath)) filePath = filePath.slice(1)
+            filePath = filePath.replace(/\//g, '\\')
+            if (existsSync(filePath)) {
+              const ext = extname(filePath)
+              if (!ext) {
+                const targetExt = item.kind === 'video' ? '.mp4' : '.png'
+                const newFilePath = `${filePath}${targetExt}`
+                if (!existsSync(newFilePath)) {
+                  copyFileSync(filePath, newFilePath)
+                }
+                item.value = `lumen-media://local/${encodeURIComponent(newFilePath.replace(/\\/g, '/'))}`
+                repaired = true
+              }
+            }
+          } catch {
+            // ignore
+          }
+        }
+      }
+      if (repaired) this.saveToDisk()
     }
 
     this.reloadMedia()
@@ -339,8 +369,8 @@ export class WorkspaceStore {
           if (comma !== -1) {
             const rawB64 = input.value.slice(comma + 1)
             const ext = input.kind === 'video' ? '.mp4' : '.png'
-            const safeName = input.name.replace(/[^a-zA-Z0-9_\-.]/g, '_')
-            const fileName = safeName.includes('.') ? safeName : `${safeName}${ext}`
+            const safeName = input.name.replace(/[^a-zA-Z0-9_\-]/g, '_')
+            const fileName = `${safeName}${ext}`
             const targetPath = join(destDir, fileName)
             if (!existsSync(targetPath)) {
               writeFileSync(targetPath, Buffer.from(rawB64, 'base64'))

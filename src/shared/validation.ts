@@ -149,6 +149,9 @@ export function parsePresentationSlide(input: unknown): PresentationSlide {
     footer
   }
   if (imageUrl) slide.imageUrl = imageUrl
+  if (input['mediaKind'] === 'video' || input['mediaKind'] === 'image') {
+    slide.mediaKind = input['mediaKind']
+  }
   if (Array.isArray(input['parallelLines'])) {
     slide.parallelLines = (input['parallelLines'] as unknown[])
       .slice(0, 20)

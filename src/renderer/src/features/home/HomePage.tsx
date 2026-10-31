@@ -44,9 +44,13 @@ export function HomePage({ app }: HomePageProps) {
   const handleUploadMediaFiles = (e: ChangeEvent<HTMLInputElement>): void => {
     const files = Array.from(e.target.files ?? [])
     files.forEach((file) => {
-      const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov|mkv)$/i.test(file.name)
-      const fileUrl = (file as unknown as { path?: string }).path
-      if (fileUrl) {
+      const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov|mkv|avi|ogv|m4v)$/i.test(file.name)
+      const nativePath =
+        (file as unknown as { path?: string }).path ||
+        (typeof window !== 'undefined' &&
+          (window as unknown as { lumen?: { getPathForFile?: (f: File) => string } }).lumen?.getPathForFile?.(file))
+      if (nativePath) {
+        const fileUrl = `lumen-media://local/${encodeURIComponent(nativePath.replace(/\\/g, '/'))}`
         void app.addMedia({
           name: file.name.replace(/\.[^/.]+$/, ''),
           kind: isVideo ? 'video' : 'image',
@@ -202,6 +206,7 @@ export function HomePage({ app }: HomePageProps) {
     }
     if (activeTab === 'images') {
       if (!selectedMedia) return []
+      const isVid = selectedMedia.kind === 'video' || isVideoUrl(selectedMedia.value)
       return [
         {
           id: `media-preview-${selectedMedia.id}`,
@@ -210,7 +215,8 @@ export function HomePage({ app }: HomePageProps) {
           label: selectedMedia.name,
           lines: [],
           footer: '',
-          imageUrl: isVideoUrl(selectedMedia.value) ? resolveMediaVideoUrl(selectedMedia.value) : selectedMedia.value
+          imageUrl: isVideoUrl(selectedMedia.value) ? resolveMediaVideoUrl(selectedMedia.value) : selectedMedia.value,
+          mediaKind: isVid ? 'video' : 'image'
         }
       ]
     }
@@ -261,7 +267,8 @@ export function HomePage({ app }: HomePageProps) {
           label: img.name,
           lines: [],
           footer: '',
-          imageUrl: mediaVal
+          imageUrl: mediaVal,
+          mediaKind: isVid ? 'video' : 'image'
         }
       ],
       startIndex: 0,
@@ -689,7 +696,7 @@ export function HomePage({ app }: HomePageProps) {
                   <span className="hly-slide-row__text">
                     {slide.imageUrl ? (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                        {isVideoUrl(slide.imageUrl) ? (
+                        {slide.mediaKind === 'video' || isVideoUrl(slide.imageUrl) ? (
                           <video
                             src={resolveMediaVideoUrl(slide.imageUrl)}
                             muted
@@ -700,7 +707,7 @@ export function HomePage({ app }: HomePageProps) {
                         ) : (
                           <img src={slide.imageUrl} alt={slide.label} style={{ height: 32, borderRadius: 3, border: '1px solid #444' }} />
                         )}
-                        <span>[{isVideoUrl(slide.imageUrl) ? 'Vídeo' : 'Imagen'} a pantalla completa: {slide.label}]</span>
+                        <span>[{slide.mediaKind === 'video' || isVideoUrl(slide.imageUrl) ? 'Vídeo' : 'Imagen'} a pantalla completa: {slide.label}]</span>
                       </span>
                     ) : (
                       slide.lines.map((line, lineIdx) => (

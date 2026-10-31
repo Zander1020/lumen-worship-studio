@@ -102,7 +102,8 @@ export function HolyricsLeftDock({ app }: HolyricsLeftDockProps) {
           label: item.name,
           lines: [],
           footer: '',
-          imageUrl: mediaVal
+          imageUrl: mediaVal,
+          mediaKind: item.kind === 'video' ? 'video' : 'image'
         }
       ],
       startIndex: 0,

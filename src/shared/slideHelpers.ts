@@ -610,6 +610,14 @@ export function isVideoUrl(url?: string): boolean {
   if (lower.startsWith('data:video/')) return true
   if (lower.startsWith('blob:')) return true
   if (lower.startsWith('lumen-media:')) {
+    let decoded = lower
+    try {
+      decoded = decodeURIComponent(lower)
+    } catch {
+      // ignore
+    }
+    if (/\.(mp4|webm|mkv|mov|avi|ogv|m4v)($|\?|#)/i.test(decoded)) return true
+    if (decoded.includes('video') || decoded.includes('vídeo') || decoded.includes('whatsapp_video')) return true
     return /\.(mp4|webm|mkv|mov|avi|ogv|m4v)($|\?|#)/i.test(lower)
   }
   if (lower.startsWith('data:application/octet-stream') || lower.startsWith('data:;base64')) return true
