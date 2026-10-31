@@ -49,6 +49,12 @@ export function HolyricsLeftDock({ app }: HolyricsLeftDockProps) {
         try {
           const deck = await convertPdfToSlides(file, file.name)
           if (deck.slides.length > 0) {
+            void app.addMedia({
+              name: deck.title,
+              kind: 'image',
+              value: deck.slides[0]?.imageUrl || '',
+              category: 'Culto'
+            })
             void app.addScheduleItem({
               kind: 'announcement',
               title: `PDF: ${deck.title}`,
@@ -70,6 +76,12 @@ export function HolyricsLeftDock({ app }: HolyricsLeftDockProps) {
         try {
           const deck = await convertPptxToSlides(file, file.name)
           if (deck.slides.length > 0) {
+            void app.addMedia({
+              name: deck.title,
+              kind: 'image',
+              value: deck.slides[0]?.imageUrl || '',
+              category: 'Culto'
+            })
             void app.addScheduleItem({
               kind: 'announcement',
               title: `PowerPoint: ${deck.title}`,

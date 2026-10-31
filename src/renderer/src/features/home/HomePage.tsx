@@ -51,12 +51,21 @@ export function HomePage({ app }: HomePageProps) {
         try {
           const deck = await convertPdfToSlides(file, file.name)
           if (deck.slides.length > 0) {
+            // 1. Guardar la primera lámina como medio en la galería para que se vea en el catálogo
+            void app.addMedia({
+              name: deck.title,
+              kind: 'image',
+              value: deck.slides[0]?.imageUrl || '',
+              category: 'Culto'
+            })
+            // 2. Agregar a la lista de reproducción / cronograma
             void app.addScheduleItem({
               kind: 'announcement',
               title: `PDF: ${deck.title}`,
               subtitle: `${deck.slides.length} páginas`,
               slides: deck.slides
             })
+            // 3. Cargar en la mesa de control de diapositivas
             void app.loadProjectionDeck({
               deckTitle: deck.title,
               slides: deck.slides,
@@ -72,12 +81,21 @@ export function HomePage({ app }: HomePageProps) {
         try {
           const deck = await convertPptxToSlides(file, file.name)
           if (deck.slides.length > 0) {
+            // 1. Guardar la primera lámina como medio en la galería
+            void app.addMedia({
+              name: deck.title,
+              kind: 'image',
+              value: deck.slides[0]?.imageUrl || '',
+              category: 'Culto'
+            })
+            // 2. Agregar a la lista de reproducción / cronograma
             void app.addScheduleItem({
               kind: 'announcement',
               title: `PowerPoint: ${deck.title}`,
               subtitle: `${deck.slides.length} diapositivas`,
               slides: deck.slides
             })
+            // 3. Cargar en la mesa de control de diapositivas
             void app.loadProjectionDeck({
               deckTitle: deck.title,
               slides: deck.slides,

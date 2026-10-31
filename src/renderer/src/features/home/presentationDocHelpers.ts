@@ -1,13 +1,11 @@
 import * as pdfjsLib from 'pdfjs-dist'
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import JSZip from 'jszip'
 import type { PresentationSlide } from '../../../../shared/models'
 
 // Configurar worker de pdfjs en entorno web/renderer
 if (typeof window !== 'undefined' && pdfjsLib.GlobalWorkerOptions) {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/build/pdf.worker.min.mjs',
-    import.meta.url
-  ).toString()
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker
 }
 
 export interface ExtractedSlideItem {
