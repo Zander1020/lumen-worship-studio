@@ -1,0 +1,38 @@
+appId: com.lumenworship.studio
+productName: Lumen Worship Studio
+directories:
+  buildResources: build
+  output: release
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!e2e/*'
+  - '!electron.vite.config.*'
+  - '!vitest.config.*'
+  - '!playwright.config.*'
+  - '!eslint.config.*'
+  - '!tsconfig*.json'
+extraResources:
+  - from: bd.mufl
+    to: bd.mufl
+  - from: out/main/es_rvr.json
+    to: es_rvr.json
+  - from: lumen.png
+    to: lumen.png
+win:
+  icon: lumen.png
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  allowElevation: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Lumen Worship Studio
+  uninstallDisplayName: Lumen Worship Studio
+  runAfterFinish: true
+artifactName: ${productName}-Setup-${version}.${ext}
