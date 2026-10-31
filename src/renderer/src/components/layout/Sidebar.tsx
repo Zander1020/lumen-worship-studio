@@ -93,43 +93,6 @@ export function Sidebar({ active, onSelect, app }: SidebarProps) {
 
   return (
     <header className="hly-topbar">
-      {/* Fila clásica de menú estilo Windows / Holyrics */}
-      <div className="hly-menubar" aria-hidden="true">
-        <span className="hly-menubar__brand" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <img src={lumenLogo} alt="Logo" style={{ width: 14, height: 14, objectFit: 'contain' }} />
-          <span>Lumen Studio</span>
-        </span>
-        <div className="hly-menubar__items">
-          <button type="button" className="hly-menubar__item" onClick={() => onSelect('home')}>
-            Archivo / Consola
-          </button>
-          <button type="button" className="hly-menubar__item" onClick={() => onSelect('songs')}>
-            Música
-          </button>
-          <button type="button" className="hly-menubar__item" onClick={() => onSelect('bible')}>
-            Biblia (66)
-          </button>
-          <button type="button" className="hly-menubar__item" onClick={() => onSelect('media')}>
-            Imágenes
-          </button>
-          <button type="button" className="hly-menubar__item" onClick={() => onSelect('design')}>
-            Editor Gráfico
-          </button>
-          <button type="button" className="hly-menubar__item" onClick={() => onSelect('projection')}>
-            Proyección
-          </button>
-          <button type="button" className="hly-menubar__item" onClick={() => onSelect('remote')}>
-            Red LAN / OBS
-          </button>
-          <button type="button" className="hly-menubar__item" onClick={() => onSelect('settings')}>
-            Herramientas
-          </button>
-          <button type="button" className="hly-menubar__item" onClick={() => onSelect('about')}>
-            Acerca de
-          </button>
-        </div>
-      </div>
-
       <div className="hly-topbar__main">
         <div className="sidebar__brand">
           <span className="sidebar__logo" aria-hidden="true">

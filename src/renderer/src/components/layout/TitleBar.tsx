@@ -65,19 +65,6 @@ export function TitleBar({ title = 'Lumen Studio', subtitle = 'Cabina Profesiona
         >
           {title}
         </span>
-        <span
-          style={{
-            fontSize: 10,
-            fontWeight: 600,
-            color: '#94a3b8',
-            background: 'rgba(255, 255, 255, 0.06)',
-            padding: '1px 6px',
-            borderRadius: 4,
-            border: '1px solid rgba(255, 255, 255, 0.08)'
-          }}
-        >
-          {subtitle}
-        </span>
       </div>
 
       <div

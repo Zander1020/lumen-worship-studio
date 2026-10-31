@@ -187,6 +187,150 @@ export function MotionVideoBackground({
           ctx.closePath()
           ctx.fill()
         }
+      } else if (variant === 'ocean') {
+        // Océano de Gracia: Ondas profundas azul cian y turquesa
+        const bg = ctx.createLinearGradient(0, 0, 0, h)
+        bg.addColorStop(0, '#031926')
+        bg.addColorStop(0.5, '#06283d')
+        bg.addColorStop(1, '#020b12')
+        ctx.fillStyle = bg
+        ctx.fillRect(0, 0, w, h)
+
+        for (let i = 0; i < 5; i++) {
+          ctx.beginPath()
+          const yBase = h * (0.35 + i * 0.14)
+          ctx.moveTo(0, h)
+          for (let x = 0; x <= w; x += 15) {
+            const y = yBase + Math.sin(x * 0.012 + t * (0.9 + i * 0.25) + i * 1.5) * (h * 0.09) + Math.cos(x * 0.006 - t * 0.6) * (h * 0.05)
+            ctx.lineTo(x, y)
+          }
+          ctx.lineTo(w, h)
+          ctx.closePath()
+          const grad = ctx.createLinearGradient(0, yBase - h * 0.15, 0, h)
+          const c = ['rgba(6, 182, 212, 0.28)', 'rgba(20, 184, 166, 0.22)', 'rgba(59, 130, 246, 0.20)', 'rgba(14, 116, 144, 0.25)', 'rgba(8, 145, 178, 0.18)']
+          grad.addColorStop(0, c[i % c.length] ?? 'rgba(6, 182, 212, 0.2)')
+          grad.addColorStop(1, 'rgba(2, 11, 18, 0.05)')
+          ctx.fillStyle = grad
+          ctx.fill()
+        }
+      } else if (variant === 'fire') {
+        // Fuego Santo: Destellos cálidos ascendentes naranja y ámbar
+        const bg = ctx.createRadialGradient(w * 0.5, h * 0.8, 20, w * 0.5, h * 0.5, w * 0.7)
+        bg.addColorStop(0, '#3b1204')
+        bg.addColorStop(0.6, '#180702')
+        bg.addColorStop(1, '#050201')
+        ctx.fillStyle = bg
+        ctx.fillRect(0, 0, w, h)
+
+        for (let i = 0; i < 40; i++) {
+          const seed = i * 23.19
+          const px = ((seed * 37.3 + Math.sin(t * 1.2 + i) * 35) % w + w) % w
+          const py = ((h - ((t * (25 + (i % 6) * 8) + seed * 31) % (h + 50))) + h + 25) % (h + 50) - 20
+          const radius = 2 + (i % 4) * 2.2
+          const alpha = 0.3 + 0.5 * Math.abs(Math.sin(t * 2.0 + i))
+          const glow = ctx.createRadialGradient(px, py, 0, px, py, radius * 3.5)
+          glow.addColorStop(0, `rgba(251, 146, 60, ${alpha.toFixed(2)})`)
+          glow.addColorStop(0.5, `rgba(239, 68, 68, ${(alpha * 0.6).toFixed(2)})`)
+          glow.addColorStop(1, 'rgba(185, 28, 28, 0)')
+          ctx.fillStyle = glow
+          ctx.beginPath()
+          ctx.arc(px, py, radius * 3.5, 0, Math.PI * 2)
+          ctx.fill()
+        }
+      } else if (variant === 'stars') {
+        // Cielo Estrellado: Galaxia profunda con estrellas titilantes
+        const bg = ctx.createRadialGradient(w * 0.5, h * 0.4, 10, w * 0.5, h * 0.5, w * 0.9)
+        bg.addColorStop(0, '#150a2b')
+        bg.addColorStop(0.5, '#0a0518')
+        bg.addColorStop(1, '#030208')
+        ctx.fillStyle = bg
+        ctx.fillRect(0, 0, w, h)
+
+        for (let i = 0; i < 45; i++) {
+          const sx = ((i * 123.45) % w + w) % w
+          const sy = ((i * 789.01) % h + h) % h
+          const twinkle = 0.2 + 0.8 * Math.abs(Math.sin(t * 1.5 + i * 0.8))
+          const starGrad = ctx.createRadialGradient(sx, sy, 0, sx, sy, 3.5)
+          starGrad.addColorStop(0, `rgba(216, 180, 254, ${twinkle.toFixed(2)})`)
+          starGrad.addColorStop(1, 'rgba(168, 85, 247, 0)')
+          ctx.fillStyle = starGrad
+          ctx.beginPath()
+          ctx.arc(sx, sy, 3.5, 0, Math.PI * 2)
+          ctx.fill()
+        }
+      } else if (variant === 'sunset') {
+        // Atardecer Celestial: Degradado dinámico rosa, púrpura y magenta suave
+        const bg = ctx.createLinearGradient(0, 0, w, h)
+        bg.addColorStop(0, '#2e0827')
+        bg.addColorStop(0.5, '#17061d')
+        bg.addColorStop(1, '#09020e')
+        ctx.fillStyle = bg
+        ctx.fillRect(0, 0, w, h)
+
+        const orbs = [
+          { color: '244, 114, 182', speed: 0.5, r: 0.55 },
+          { color: '217, 70, 239', speed: -0.4, r: 0.48 },
+          { color: '251, 146, 60', speed: 0.6, r: 0.35 }
+        ]
+        orbs.forEach((orb, idx) => {
+          const cx = w * (0.5 + 0.25 * Math.sin(t * orb.speed + idx * 2.3))
+          const cy = h * (0.5 + 0.22 * Math.cos(t * (orb.speed * 1.1) + idx * 1.9))
+          const rad = Math.max(w, h) * orb.r
+          const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad)
+          g.addColorStop(0, `rgba(${orb.color}, 0.30)`)
+          g.addColorStop(0.5, `rgba(${orb.color}, 0.10)`)
+          g.addColorStop(1, `rgba(${orb.color}, 0)`)
+          ctx.fillStyle = g
+          ctx.fillRect(0, 0, w, h)
+        })
+      } else if (variant === 'amber') {
+        // Destellos Ámbar: Partículas luminosas flotantes doradas en cámara lenta
+        const bg = ctx.createLinearGradient(0, 0, 0, h)
+        bg.addColorStop(0, '#1c1607')
+        bg.addColorStop(0.6, '#0f0c04')
+        bg.addColorStop(1, '#050401')
+        ctx.fillStyle = bg
+        ctx.fillRect(0, 0, w, h)
+
+        for (let i = 0; i < 30; i++) {
+          const seed = i * 31.41
+          const px = ((seed * 53.7 + Math.cos(t * 0.5 + i) * 40) % w + w) % w
+          const py = ((seed * 89.1 + Math.sin(t * 0.4 + i) * 35) % h + h) % h
+          const alpha = 0.2 + 0.6 * Math.abs(Math.sin(t * 1.1 + i))
+          const glow = ctx.createRadialGradient(px, py, 0, px, py, 14)
+          glow.addColorStop(0, `rgba(250, 204, 21, ${alpha.toFixed(2)})`)
+          glow.addColorStop(0.4, `rgba(234, 179, 8, ${(alpha * 0.4).toFixed(2)})`)
+          glow.addColorStop(1, 'rgba(234, 179, 8, 0)')
+          ctx.fillStyle = glow
+          ctx.beginPath()
+          ctx.arc(px, py, 14, 0, Math.PI * 2)
+          ctx.fill()
+        }
+      } else if (variant === 'emerald') {
+        // Manantial Esmeralda: Ondas serenas de vida y esperanza verde esmeralda
+        const bg = ctx.createLinearGradient(0, 0, 0, h)
+        bg.addColorStop(0, '#041c14')
+        bg.addColorStop(0.55, '#02120d')
+        bg.addColorStop(1, '#010805')
+        ctx.fillStyle = bg
+        ctx.fillRect(0, 0, w, h)
+
+        for (let i = 0; i < 4; i++) {
+          ctx.beginPath()
+          const yBase = h * (0.32 + i * 0.16)
+          ctx.moveTo(0, h)
+          for (let x = 0; x <= w; x += 15) {
+            const y = yBase + Math.sin(x * 0.01 + t * (0.8 + i * 0.2) + i) * (h * 0.1)
+            ctx.lineTo(x, y)
+          }
+          ctx.lineTo(w, h)
+          ctx.closePath()
+          const wave = ctx.createLinearGradient(0, yBase - h * 0.15, 0, h)
+          wave.addColorStop(0, `rgba(16, 185, 129, ${(0.22 - i * 0.03).toFixed(2)})`)
+          wave.addColorStop(1, 'rgba(4, 28, 20, 0.02)')
+          ctx.fillStyle = wave
+          ctx.fill()
+        }
       } else {
         // nebula
         const bg = ctx.createLinearGradient(0, 0, w, h)

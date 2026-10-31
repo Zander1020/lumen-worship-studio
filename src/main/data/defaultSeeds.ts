@@ -19,14 +19,14 @@ export const DEFAULT_MEDIA_BACKGROUND: MediaBackground = {
 export const DEFAULT_MEDIA_BACKGROUNDS: readonly MediaBackground[] = [
   {
     id: 'bg-video-aurora',
-    name: '🎬 Video: Aurora Celestial',
+    name: '🎬 Video: Aurora Boreal',
     kind: 'video',
     value: 'motion:aurora',
     accentColor: '#38bdf8'
   },
   {
     id: 'bg-video-particles',
-    name: '🎬 Video: Partículas Doradas',
+    name: '🎬 Video: Partículas de Oro',
     kind: 'video',
     value: 'motion:particles',
     accentColor: '#facc15'
@@ -40,10 +40,52 @@ export const DEFAULT_MEDIA_BACKGROUNDS: readonly MediaBackground[] = [
   },
   {
     id: 'bg-video-nebula',
-    name: '🎬 Video: Nebulosa Viva',
+    name: '🎬 Video: Nebulosa Cósmica',
     kind: 'video',
     value: 'motion:nebula',
     accentColor: '#c084fc'
+  },
+  {
+    id: 'bg-video-ocean',
+    name: '🎬 Video: Océano de Gracia',
+    kind: 'video',
+    value: 'motion:ocean',
+    accentColor: '#06b6d4'
+  },
+  {
+    id: 'bg-video-fire',
+    name: '🎬 Video: Fuego Santo',
+    kind: 'video',
+    value: 'motion:fire',
+    accentColor: '#f97316'
+  },
+  {
+    id: 'bg-video-stars',
+    name: '🎬 Video: Cielo Estrellado',
+    kind: 'video',
+    value: 'motion:stars',
+    accentColor: '#a855f7'
+  },
+  {
+    id: 'bg-video-sunset',
+    name: '🎬 Video: Atardecer Celestial',
+    kind: 'video',
+    value: 'motion:sunset',
+    accentColor: '#ec4899'
+  },
+  {
+    id: 'bg-video-amber',
+    name: '🎬 Video: Destellos Ámbar',
+    kind: 'video',
+    value: 'motion:amber',
+    accentColor: '#eab308'
+  },
+  {
+    id: 'bg-video-emerald',
+    name: '🎬 Video: Manantial Esmeralda',
+    kind: 'video',
+    value: 'motion:emerald',
+    accentColor: '#10b981'
   },
   DEFAULT_MEDIA_BACKGROUND,
   {
