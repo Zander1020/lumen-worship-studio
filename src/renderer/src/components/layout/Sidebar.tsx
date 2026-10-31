@@ -1,5 +1,4 @@
 import { type SyntheticEvent, useEffect, useState } from 'react'
-import lumenLogo from '../../assets/lumen.png'
 import { SECTIONS, type SectionId } from '../../../../shared/sections'
 import { parseBibleCitation, resolveBibleCitationBook, versesToSlides } from '../../../../shared/slideHelpers'
 import type { UseAppStatus } from '../../hooks/useAppStatus'

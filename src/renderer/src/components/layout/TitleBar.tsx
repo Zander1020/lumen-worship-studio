@@ -6,7 +6,7 @@ export interface TitleBarProps {
   subtitle?: string
 }
 
-export function TitleBar({ title = 'Lumen Studio', subtitle = 'Cabina Profesional' }: TitleBarProps) {
+export function TitleBar({ title = 'Lumen Studio' }: TitleBarProps) {
   const [isMaximized, setIsMaximized] = useState(false)
 
   useEffect(() => {
