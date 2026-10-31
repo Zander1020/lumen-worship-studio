@@ -548,7 +548,7 @@ export function SlidePreviewStage({
   clock,
   displayCount,
   compact = false,
-  windowOpen = false,
+  windowOpen: _windowOpen = false,
   onVideoProgress
 }: SlidePreviewStageProps) {
   const { mode, slides, currentIndex, theme, churchName, welcomeSubtitle, showClockOnLogo } = live
@@ -601,15 +601,24 @@ export function SlidePreviewStage({
   useEffect(() => {
     const vid = slideVideoRef.current
     if (!vid || !isSlideVideo) return
+    const shouldMute = compact ? true : Boolean(theme.videoMuted)
+    vid.muted = shouldMute
     if (theme.videoPlaying === false) {
       vid.pause()
     } else {
       void vid.play().catch(() => {
+        // Fallback si el navegador requiere interacción inicial
         vid.muted = true
         void vid.play().catch(() => undefined)
       })
     }
-  }, [theme.videoPlaying, isSlideVideo, slideVideoSrc])
+  }, [theme.videoPlaying, isSlideVideo, slideVideoSrc, compact, theme.videoMuted])
+
+  useEffect(() => {
+    const vid = slideVideoRef.current
+    if (!vid || !isSlideVideo) return
+    vid.muted = compact ? true : Boolean(theme.videoMuted)
+  }, [compact, theme.videoMuted, isSlideVideo])
 
   useEffect(() => {
     const vid = slideVideoRef.current
@@ -617,13 +626,14 @@ export function SlidePreviewStage({
     if (theme.videoRestartTime === lastSlideRestartRef.current) return
     lastSlideRestartRef.current = theme.videoRestartTime
     vid.currentTime = 0
+    vid.muted = compact ? true : Boolean(theme.videoMuted)
     if (theme.videoPlaying !== false) {
       void vid.play().catch(() => {
         vid.muted = true
         void vid.play().catch(() => undefined)
       })
     }
-  }, [theme.videoRestartTime, theme.videoPlaying])
+  }, [theme.videoRestartTime, theme.videoPlaying, compact, theme.videoMuted])
 
   useEffect(() => {
     const vid = slideVideoRef.current
@@ -1111,7 +1121,7 @@ export function SlidePreviewStage({
             src={slideVideoSrc}
             autoPlay={theme.videoPlaying !== false}
             loop={theme.videoLoop !== false}
-            muted={compact ? (windowOpen ? true : Boolean(theme.videoMuted)) : Boolean(theme.videoMuted)}
+            muted={compact ? true : Boolean(theme.videoMuted)}
             playsInline
             preload="auto"
             onTimeUpdate={(e) => {
@@ -1127,8 +1137,9 @@ export function SlidePreviewStage({
               }
             }}
             onCanPlay={(e) => {
+              const v = e.currentTarget
+              v.muted = compact ? true : Boolean(theme.videoMuted)
               if (theme.videoPlaying !== false) {
-                const v = e.currentTarget
                 void v.play().catch(() => {
                   v.muted = true
                   void v.play().catch(() => undefined)
