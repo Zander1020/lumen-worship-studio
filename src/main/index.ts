@@ -9,6 +9,7 @@ import { StatusStore } from './state/statusStore'
 import { WorkspaceStore } from './state/workspaceStore'
 import { createMainWindow } from './windows/mainWindow'
 import { ProjectionWindowManager } from './windows/projectionWindow'
+import { initAutoUpdater } from './updater/appUpdater'
 
 // Registrar esquema multimedia local privilegiado con soporte de streaming, audio y vídeo por rangos
 protocol.registerSchemesAsPrivileged([
@@ -149,6 +150,7 @@ function bootstrap(): void {
 
       const win = createMainWindow({ preloadPath: join(preloadDir, 'mainWindow.js'), allowDevTools })
       mainWindow = win
+      initAutoUpdater(() => (mainWindow && !mainWindow.isDestroyed() ? mainWindow : null))
       win.on('closed', () => {
         mainWindow = null
         void remote.stop()

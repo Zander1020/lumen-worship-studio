@@ -3,6 +3,10 @@ productName: Lumen Worship Studio
 directories:
   buildResources: build
   output: release
+publish:
+  provider: github
+  owner: Zander1020
+  repo: lumen-worship-studio
 files:
   - '!**/.vscode/*'
   - '!src/*'

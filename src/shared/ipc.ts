@@ -97,7 +97,14 @@ export const IpcChannels = {
 
   /** Configuración */
   settingsGet: 'settings:get',
-  settingsUpdate: 'settings:update'
+  settingsUpdate: 'settings:update',
+
+  /** Auto-actualizador */
+  updaterGetStatus: 'updater:get-status',
+  updaterCheck: 'updater:check',
+  updaterDownload: 'updater:download',
+  updaterInstall: 'updater:install',
+  updaterStatusChanged: 'updater:status-changed'
 } as const
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels]

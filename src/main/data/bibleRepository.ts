@@ -30,13 +30,15 @@ function normalizeText(text: string): string {
 let cachedBooks: IndexedBook[] | null = null
 
 function locateBibleJsonPath(): string | null {
-  const candidates = [
+  const candidates: string[] = [
     join(__dirname, 'es_rvr.json'),
-    join(process.resourcesPath, 'es_rvr.json'),
     join(__dirname, '../data/es_rvr.json'),
     join(__dirname, '../../src/main/data/es_rvr.json'),
     join(process.cwd(), 'src/main/data/es_rvr.json')
   ]
+  if (typeof process.resourcesPath === 'string') {
+    candidates.unshift(join(process.resourcesPath, 'es_rvr.json'))
+  }
   for (const candidate of candidates) {
     if (existsSync(candidate)) return candidate
   }

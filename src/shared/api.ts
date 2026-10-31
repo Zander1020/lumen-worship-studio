@@ -89,6 +89,19 @@ export interface LumenApi {
   /** Configuración */
   readonly getSettings: () => Promise<AppSettings>
   readonly updateSettings: (patch: Partial<AppSettings>) => Promise<AppSettings>
+
+  /** Auto-actualizador */
+  readonly getUpdateStatus?: () => Promise<{
+    status: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'
+    version?: string
+    releaseNotes?: string
+    progressPercent?: number
+    error?: string
+  }>
+  readonly checkForUpdates?: () => Promise<unknown>
+  readonly downloadUpdate?: () => Promise<boolean>
+  readonly installUpdate?: () => Promise<boolean>
+  readonly onUpdateStatusChanged?: (listener: (status: any) => void) => () => void
 }
 
 /**

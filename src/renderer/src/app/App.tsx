@@ -5,6 +5,7 @@ import { LiveDock } from '../components/layout/LiveDock'
 import { Sidebar } from '../components/layout/Sidebar'
 import { StatusBar } from '../components/layout/StatusBar'
 import { TitleBar } from '../components/layout/TitleBar'
+import { UpdateNotifierModal } from '../components/UpdateNotifierModal'
 import { renderSection } from '../features/sectionRegistry'
 import { useAppStatus } from '../hooks/useAppStatus'
 
@@ -37,6 +38,7 @@ export function App() {
         {!isEditorWorkspace && <LiveDock app={app} />}
       </div>
       <StatusBar status={app.status} />
+      <UpdateNotifierModal />
     </div>
   )
 }

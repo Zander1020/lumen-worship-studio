@@ -112,7 +112,21 @@ const api: LumenApi = {
   minimizeWindow: () => ipcRenderer.invoke(IpcChannels.windowMinimize) as Promise<boolean>,
   maximizeWindow: () => ipcRenderer.invoke(IpcChannels.windowMaximize) as Promise<boolean>,
   closeWindow: () => ipcRenderer.invoke(IpcChannels.windowClose) as Promise<boolean>,
-  isWindowMaximized: () => ipcRenderer.invoke(IpcChannels.windowIsMaximized) as Promise<boolean>
+  isWindowMaximized: () => ipcRenderer.invoke(IpcChannels.windowIsMaximized) as Promise<boolean>,
+
+  getUpdateStatus: () => ipcRenderer.invoke(IpcChannels.updaterGetStatus),
+  checkForUpdates: () => ipcRenderer.invoke(IpcChannels.updaterCheck),
+  downloadUpdate: () => ipcRenderer.invoke(IpcChannels.updaterDownload),
+  installUpdate: () => ipcRenderer.invoke(IpcChannels.updaterInstall),
+  onUpdateStatusChanged: (listener: (status: any) => void) => {
+    const wrapped = (_event: IpcRendererEvent, status: any): void => {
+      listener(status)
+    }
+    ipcRenderer.on(IpcChannels.updaterStatusChanged, wrapped)
+    return () => {
+      ipcRenderer.removeListener(IpcChannels.updaterStatusChanged, wrapped)
+    }
+  }
 }
 
 contextBridge.exposeInMainWorld('lumen', api)

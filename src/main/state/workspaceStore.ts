@@ -112,13 +112,15 @@ export class WorkspaceStore {
 
     // Auto-cargar catálogo .mufl si está disponible y la base de datos sólo tiene las 5 canciones por defecto
     if (this.songs.length <= 5) {
-      const muflCandidates = [
-        join(process.resourcesPath, 'bd.mufl'),
+      const muflCandidates: string[] = [
         join(process.cwd(), 'bd.mufl'),
         join(__dirname, '../../bd.mufl'),
         join(homedir(), 'Downloads', 'bd.mufl'),
         'C:\\Users\\Zander\\Downloads\\bd.mufl'
       ]
+      if (typeof process.resourcesPath === 'string') {
+        muflCandidates.unshift(join(process.resourcesPath, 'bd.mufl'))
+      }
       for (const p of muflCandidates) {
         if (existsSync(p)) {
           try {
