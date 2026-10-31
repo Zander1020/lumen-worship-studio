@@ -99,7 +99,7 @@ describe('WorkspaceStore', () => {
         title: 'Presentación Huérfana',
         subtitle: '1 diapositiva',
         kind: 'pptx',
-        slides: [{ id: 's1', label: 'Diapositiva 1', content: 'Prueba', lines: ['Prueba'] }]
+        slides: [{ id: 's1', sourceKind: 'custom', sourceTitle: 'Test', label: 'Diapositiva 1', lines: ['Prueba'], footer: '' }]
       })
 
       expect(store.listPresentations().length).toBe(1)
@@ -121,7 +121,7 @@ describe('WorkspaceStore', () => {
         subtitle: '1 diapositiva',
         kind: 'pptx',
         filePath: realPptx,
-        slides: [{ id: 's1', label: 'Diapositiva 1', content: 'Contenido', lines: ['Contenido'] }]
+        slides: [{ id: 's1', sourceKind: 'custom', sourceTitle: 'Tema', label: 'Diapositiva 1', lines: ['Contenido'], footer: '' }]
       })
 
       expect(store.listPresentations().length).toBe(1)
