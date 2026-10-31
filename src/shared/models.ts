@@ -78,6 +78,7 @@ export interface MediaBackground {
   value: string
   accentColor: string
   category?: string
+  slides?: PresentationSlide[]
 }
 
 export interface MediaBackgroundInput {
@@ -86,6 +87,7 @@ export interface MediaBackgroundInput {
   value: string
   accentColor?: string
   category?: string
+  slides?: PresentationSlide[]
 }
 
 export type SlideSourceKind = 'song' | 'bible' | 'announcement' | 'custom' | 'separator'

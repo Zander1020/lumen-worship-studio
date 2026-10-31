@@ -18,7 +18,7 @@ export interface HomePageProps {
   app: UseAppStatus
 }
 
-type QuickTab = 'music' | 'bible' | 'images' | 'text'
+type QuickTab = 'music' | 'bible' | 'presentation' | 'images' | 'text'
 
 function stanzaTagClass(label: string): string {
   const l = label.toLowerCase()
@@ -30,17 +30,91 @@ function stanzaTagClass(label: string): string {
 
 /**
  * Mesa Principal de Operación idéntica a la ventana central de Holyrics:
- * - Izquierda: Catálogo rápido con pestañas (Música, Biblia 66 libros, Imágenes del Culto, Texto/Alerta rápida).
- * - Derecha: Barra de pestañas de documentos abiertos + Tabla numerada de Párrafos / Versículos en Previsualización.
+ * - Izquierda: Catálogo rápido con pestañas (Música, Biblia 66 libros, Presentaciones PDF/PPTX, Imágenes del Culto, Texto/Alerta rápida).
+ * - Derecha: Barra de pestañas de documentos abiertos + Tabla numerada de Párrafos / Versículos / Diapositivas en Previsualización.
  */
 export function HomePage({ app }: HomePageProps) {
   const [activeTab, setActiveTab] = useState<QuickTab>('music')
   const [songQuery, setSongQuery] = useState('')
   const [selectedSongId, setSelectedSongId] = useState<string | null>(null)
   const [openSongTabIds, setOpenSongTabIds] = useState<string[]>([])
+  const [openDocTabs, setOpenDocTabs] = useState<Array<{ id: string; title: string; slides: PresentationSlide[] }>>([])
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(null)
+  const [presentationSearch, setPresentationSearch] = useState('')
   const [imageSearch, setImageSearch] = useState('')
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null)
   const homeMediaInputRef = useRef<HTMLInputElement | null>(null)
+  const presentationFileInputRef = useRef<HTMLInputElement | null>(null)
+  const activeSlideRef = useRef<HTMLButtonElement | null>(null)
+
+  const handleUploadPresentationFile = async (e: ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const files = Array.from(e.target.files ?? [])
+    for (const file of files) {
+      const lower = file.name.toLowerCase()
+      if (lower.endsWith('.pdf')) {
+        try {
+          const deck = await convertPdfToSlides(file, file.name)
+          if (deck.slides.length > 0) {
+            void app.addMedia({
+              name: deck.title,
+              kind: 'image',
+              value: deck.slides[0]?.imageUrl || '',
+              category: 'Culto',
+              slides: deck.slides
+            })
+            void app.addScheduleItem({
+              kind: 'announcement',
+              title: `PDF: ${deck.title}`,
+              subtitle: `${deck.slides.length} páginas`,
+              slides: deck.slides
+            })
+            setOpenDocTabs((prev) => [...prev.filter((d) => d.title !== deck.title), { id: `doc-${Date.now()}`, title: deck.title, slides: deck.slides }])
+            setSelectedDocId(deck.title)
+            setActiveTab('presentation')
+            void app.loadProjectionDeck({
+              deckTitle: deck.title,
+              slides: deck.slides,
+              startIndex: 0,
+              openWindow: false
+            })
+          }
+        } catch (err) {
+          console.error('Error al procesar PDF:', err)
+        }
+      } else if (lower.endsWith('.pptx')) {
+        try {
+          const deck = await convertPptxToSlides(file, file.name)
+          if (deck.slides.length > 0) {
+            void app.addMedia({
+              name: deck.title,
+              kind: 'image',
+              value: deck.slides[0]?.imageUrl || '',
+              category: 'Culto',
+              slides: deck.slides
+            })
+            void app.addScheduleItem({
+              kind: 'announcement',
+              title: `PowerPoint: ${deck.title}`,
+              subtitle: `${deck.slides.length} diapositivas`,
+              slides: deck.slides
+            })
+            setOpenDocTabs((prev) => [...prev.filter((d) => d.title !== deck.title), { id: `doc-${Date.now()}`, title: deck.title, slides: deck.slides }])
+            setSelectedDocId(deck.title)
+            setActiveTab('presentation')
+            void app.loadProjectionDeck({
+              deckTitle: deck.title,
+              slides: deck.slides,
+              startIndex: 0,
+              openWindow: false
+            })
+          }
+        } catch (err) {
+          console.error('Error al procesar PPTX:', err)
+        }
+      }
+    }
+    e.target.value = ''
+  }
 
   const handleUploadMediaFiles = (e: ChangeEvent<HTMLInputElement>): void => {
     const files = Array.from(e.target.files ?? [])
@@ -56,7 +130,8 @@ export function HomePage({ app }: HomePageProps) {
               name: deck.title,
               kind: 'image',
               value: deck.slides[0]?.imageUrl || '',
-              category: 'Culto'
+              category: 'Culto',
+              slides: deck.slides
             })
             // 2. Agregar a la lista de reproducción / cronograma
             void app.addScheduleItem({
@@ -65,6 +140,9 @@ export function HomePage({ app }: HomePageProps) {
               subtitle: `${deck.slides.length} páginas`,
               slides: deck.slides
             })
+            setOpenDocTabs((prev) => [...prev.filter((d) => d.title !== deck.title), { id: `doc-${Date.now()}`, title: deck.title, slides: deck.slides }])
+            setSelectedDocId(deck.title)
+            setActiveTab('presentation')
             // 3. Cargar en la mesa de control de diapositivas
             void app.loadProjectionDeck({
               deckTitle: deck.title,
@@ -86,7 +164,8 @@ export function HomePage({ app }: HomePageProps) {
               name: deck.title,
               kind: 'image',
               value: deck.slides[0]?.imageUrl || '',
-              category: 'Culto'
+              category: 'Culto',
+              slides: deck.slides
             })
             // 2. Agregar a la lista de reproducción / cronograma
             void app.addScheduleItem({
@@ -95,6 +174,9 @@ export function HomePage({ app }: HomePageProps) {
               subtitle: `${deck.slides.length} diapositivas`,
               slides: deck.slides
             })
+            setOpenDocTabs((prev) => [...prev.filter((d) => d.title !== deck.title), { id: `doc-${Date.now()}`, title: deck.title, slides: deck.slides }])
+            setSelectedDocId(deck.title)
+            setActiveTab('presentation')
             // 3. Cargar en la mesa de control de diapositivas
             void app.loadProjectionDeck({
               deckTitle: deck.title,
@@ -251,26 +333,179 @@ export function HomePage({ app }: HomePageProps) {
     setOpenSongTabIds((prev) => prev.filter((id) => id !== songId))
   }
 
+  const closeDocTab = (tabId: string): void => {
+    setOpenDocTabs((prev) => prev.filter((d) => d.id !== tabId && d.title !== tabId))
+  }
+
+  // Recopilar presentaciones disponibles (pestañas abiertas, cronograma y medios con diapositivas)
+  const presentationDecks = useMemo(() => {
+    const list: Array<{ id: string; title: string; subtitle: string; slides: PresentationSlide[]; kind: 'pdf' | 'pptx' }> = []
+    const seenTitles = new Set<string>()
+
+    // 1. Pestañas abiertas en la sesión
+    openDocTabs.forEach((d) => {
+      const lower = d.title.toLowerCase()
+      if (!seenTitles.has(lower)) {
+        seenTitles.add(lower)
+        const isPdf = lower.includes('.pdf') || lower.includes('pdf')
+        list.push({
+          id: d.id,
+          title: d.title,
+          subtitle: `${d.slides.length} diapositivas / páginas`,
+          slides: d.slides,
+          kind: isPdf ? 'pdf' : 'pptx'
+        })
+      }
+    })
+
+    // 2. Cronograma (Schedule)
+    app.schedule.forEach((s) => {
+      if (s.slides && s.slides.length > 0) {
+        const cleanTitle = s.title.replace(/^(PDF|PowerPoint):\s*/i, '').trim()
+        const lower = cleanTitle.toLowerCase()
+        const isDoc =
+          s.title.toLowerCase().startsWith('pdf:') ||
+          s.title.toLowerCase().startsWith('powerpoint:') ||
+          s.slides.some((sl) => sl.label.toLowerCase().includes('página') || sl.label.toLowerCase().includes('diapositiva'))
+        if (isDoc && !seenTitles.has(lower)) {
+          seenTitles.add(lower)
+          const isPdf = s.title.toLowerCase().includes('pdf')
+          list.push({
+            id: s.id,
+            title: cleanTitle,
+            subtitle: `${s.slides.length} diapositivas / páginas`,
+            slides: s.slides,
+            kind: isPdf ? 'pdf' : 'pptx'
+          })
+        }
+      }
+    })
+
+    // 3. Medios que contengan diapositivas
+    app.media.forEach((m) => {
+      if (m.slides && m.slides.length > 0) {
+        const lower = m.name.toLowerCase()
+        if (!seenTitles.has(lower)) {
+          seenTitles.add(lower)
+          const isPdf = lower.includes('pdf')
+          list.push({
+            id: m.id,
+            title: m.name,
+            subtitle: `${m.slides.length} diapositivas / páginas`,
+            slides: m.slides,
+            kind: isPdf ? 'pdf' : 'pptx'
+          })
+        }
+      }
+    })
+
+    return list
+  }, [openDocTabs, app.schedule, app.media])
+
+  const filteredPresentations = useMemo(() => {
+    const q = presentationSearch.trim().toLowerCase()
+    if (!q) return presentationDecks
+    return presentationDecks.filter((p) => p.title.toLowerCase().includes(q))
+  }, [presentationDecks, presentationSearch])
+
+  const selectedDocDeck = useMemo(() => {
+    if (selectedDocId) {
+      const match = presentationDecks.find((d) => d.id === selectedDocId || d.title.toLowerCase() === selectedDocId.toLowerCase())
+      if (match) return match
+    }
+    return presentationDecks[0] ?? null
+  }, [presentationDecks, selectedDocId])
+
+  const projectPresentationImmediately = (deck: { title: string; slides: PresentationSlide[] }, openWindow = true): void => {
+    setSelectedDocId(deck.title)
+    setActiveTab('presentation')
+    setOpenDocTabs((prev) => {
+      const exists = prev.some((d) => d.title === deck.title)
+      if (!exists) {
+        return [...prev, { id: `doc-${Date.now()}`, title: deck.title, slides: deck.slides }]
+      }
+      return prev
+    })
+    void app.loadProjectionDeck({
+      deckTitle: deck.title,
+      slides: deck.slides,
+      startIndex: 0,
+      openWindow
+    })
+    void app.setProjectionMode('live')
+    if (openWindow && !app.status?.projection.windowOpen) {
+      void app.openProjection({ target: 'auto' })
+    }
+  }
+
+  const live = app.status?.projection.live
+
+  // Auto-scroll para mantener la fila de diapositiva activa siempre visible en la mesa de control
+  useEffect(() => {
+    if (typeof activeSlideRef.current?.scrollIntoView === 'function') {
+      activeSlideRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    }
+  }, [live?.currentIndex, live?.deckTitle])
+
+  // Si se proyecta o carga un documento desde el dock o el cronograma, abrir su pestaña y seleccionarlo
+  useEffect(() => {
+    if (!live?.deckTitle || !live.slides || live.slides.length <= 1) return
+    const isDoc =
+      live.slides.some((s) => s.label.toLowerCase().includes('página') || s.label.toLowerCase().includes('diapositiva')) ||
+      live.deckTitle.toLowerCase().includes('pdf') ||
+      live.deckTitle.toLowerCase().includes('powerpoint') ||
+      live.deckTitle.toLowerCase().includes('presentaci')
+    if (isDoc) {
+      setOpenDocTabs((prev) => {
+        const exists = prev.some((d) => d.title === live.deckTitle)
+        if (!exists) {
+          return [...prev, { id: `doc-${Date.now()}`, title: live.deckTitle, slides: live.slides }]
+        }
+        return prev
+      })
+      setSelectedDocId(live.deckTitle)
+      setActiveTab('presentation')
+    }
+  }, [live?.deckTitle, live?.slides])
+
   const previewTitle =
     activeTab === 'music'
-      ? selectedSong?.title ?? 'Sin canción seleccionada'
-      : activeTab === 'images'
-        ? (selectedMedia ? `${selectedMedia.kind === 'video' || isVideoUrl(selectedMedia.value) ? 'Vídeo' : 'Imagen'}: ${selectedMedia.name}` : 'Sin medio seleccionado')
-        : quickTitle || 'Anuncio rápido'
+      ? selectedSong?.title ?? 'Sin alabanza seleccionada'
+      : activeTab === 'presentation'
+        ? selectedDocDeck?.title ?? 'Sin presentación seleccionada'
+        : activeTab === 'images'
+          ? (selectedMedia ? `${selectedMedia.kind === 'video' || isVideoUrl(selectedMedia.value) ? 'Vídeo' : 'Imagen'}: ${selectedMedia.name}` : 'Sin medio seleccionado')
+          : quickTitle || 'Anuncio rápido'
 
   const previewSub =
     activeTab === 'music'
       ? `${selectedSong?.author || 'Autor desconocido'} · Tono: ${selectedSong?.musicalKey || '—'}`
-      : activeTab === 'images'
-        ? (selectedMedia?.category || (selectedMedia?.kind === 'video' || isVideoUrl(selectedMedia?.value) ? 'Vídeo a Pantalla Completa' : 'Imagen a Pantalla Completa'))
-        : 'Texto / Alerta en vivo'
+      : activeTab === 'presentation'
+        ? `${selectedDocDeck?.slides.length ?? 0} diapositivas / páginas`
+        : activeTab === 'images'
+          ? (selectedMedia?.category || (selectedMedia?.kind === 'video' || isVideoUrl(selectedMedia?.value) ? 'Vídeo a Pantalla Completa' : 'Imagen a Pantalla Completa'))
+          : 'Texto / Alerta en vivo'
 
   const previewSlides: PresentationSlide[] = useMemo(() => {
     if (activeTab === 'music') {
       return selectedSong ? songToSlides(selectedSong) : []
     }
+    if (activeTab === 'presentation') {
+      return selectedDocDeck ? selectedDocDeck.slides : []
+    }
     if (activeTab === 'images') {
       if (!selectedMedia) return []
+      if (selectedMedia.slides && selectedMedia.slides.length > 0) {
+        return selectedMedia.slides
+      }
+      const matchSchedule = app.schedule.find(
+        (s) =>
+          s.title.toLowerCase().includes(selectedMedia.name.toLowerCase()) ||
+          selectedMedia.name.toLowerCase().includes(s.title.toLowerCase().replace(/^(pdf|powerpoint):\s*/i, ''))
+      )
+      if (matchSchedule && matchSchedule.slides && matchSchedule.slides.length > 0) {
+        return matchSchedule.slides
+      }
       const isVid = selectedMedia.kind === 'video' || isVideoUrl(selectedMedia.value)
       return [
         {
@@ -286,7 +521,7 @@ export function HomePage({ app }: HomePageProps) {
       ]
     }
     return [createAnnouncementSlide(quickTitle.trim() || 'Anuncio', quickBody, quickFooter.trim())]
-  }, [activeTab, quickBody, quickFooter, quickTitle, selectedMedia, selectedSong])
+  }, [activeTab, quickBody, quickFooter, quickTitle, selectedDocDeck, selectedMedia, selectedSong, app.schedule])
 
   const projectPreviewSlide = (index: number, openWindow = false): void => {
     if (previewSlides.length === 0) return
@@ -296,6 +531,7 @@ export function HomePage({ app }: HomePageProps) {
       startIndex: index,
       ...(openWindow ? { openWindow: true } : {})
     })
+    void app.setProjectionMode('live')
     if (openWindow && !app.status?.projection.windowOpen) {
       void app.openProjection({ target: 'auto' })
     }
@@ -313,6 +549,7 @@ export function HomePage({ app }: HomePageProps) {
       startIndex: 0,
       ...(openWindow ? { openWindow: true } : {})
     })
+    void app.setProjectionMode('live')
     if (openWindow && !app.status?.projection.windowOpen) {
       void app.openProjection({ target: 'auto' })
     }
@@ -322,33 +559,47 @@ export function HomePage({ app }: HomePageProps) {
     setSelectedImageId(img.id)
     const mediaVal = isVideoUrl(img.value) ? resolveMediaVideoUrl(img.value) : img.value
     const isVid = img.kind === 'video' || isVideoUrl(img.value)
+
+    const matchSchedule = app.schedule.find(
+      (s) =>
+        s.title.toLowerCase().includes(img.name.toLowerCase()) ||
+        img.name.toLowerCase().includes(s.title.toLowerCase().replace(/^(pdf|powerpoint):\s*/i, ''))
+    )
+    const deckSlides: PresentationSlide[] =
+      img.slides && img.slides.length > 0
+        ? img.slides
+        : matchSchedule && matchSchedule.slides && matchSchedule.slides.length > 0
+          ? matchSchedule.slides
+          : [
+              {
+                id: `media-deck-${img.id}`,
+                sourceKind: 'custom',
+                sourceTitle: img.name,
+                label: img.name,
+                lines: [],
+                footer: '',
+                imageUrl: mediaVal,
+                mediaKind: isVid ? 'video' : 'image'
+              }
+            ]
+
     void app.loadProjectionDeck({
       deckTitle: `${isVid ? 'Vídeo' : 'Imagen'}: ${img.name}`,
-      slides: [
-        {
-          id: `media-deck-${img.id}`,
-          sourceKind: 'custom',
-          sourceTitle: img.name,
-          label: img.name,
-          lines: [],
-          footer: '',
-          imageUrl: mediaVal,
-          mediaKind: isVid ? 'video' : 'image'
-        }
-      ],
+      slides: deckSlides,
       startIndex: 0,
       openWindow
     })
-    void app.updateProjectionTheme({
-      videoPlaying: true
-    })
+    if (isVid) {
+      void app.updateProjectionTheme({
+        videoPlaying: true,
+        videoMuted: false
+      })
+    }
     void app.setProjectionMode('live')
     if (openWindow && !app.status?.projection.windowOpen) {
       void app.openProjection({ target: 'auto' })
     }
   }
-
-  const live = app.status?.projection.live
 
   return (
     <section className="page hly-page" aria-labelledby="page-title">
@@ -375,6 +626,15 @@ export function HomePage({ app }: HomePageProps) {
               onClick={() => setActiveTab('bible')}
             >
               📖 Biblia ({app.bibleBooks.length || 66})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'presentation'}
+              className={`hly-tab-btn${activeTab === 'presentation' ? ' hly-tab-btn--active' : ''}`}
+              onClick={() => setActiveTab('presentation')}
+            >
+              📄 Diapositivas / PDF ({presentationDecks.length})
             </button>
             <button
               type="button"
@@ -498,6 +758,116 @@ export function HomePage({ app }: HomePageProps) {
           )}
 
 
+
+          {activeTab === 'presentation' && (
+            <>
+              <div
+                className="hly-panel__header"
+                style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '6px 8px'
+                }}
+              >
+                <span className="hly-panel__title">📄 DIAPOSITIVAS Y PDF ({filteredPresentations.length})</span>
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <input
+                    ref={presentationFileInputRef}
+                    type="file"
+                    accept=".pdf,.pptx"
+                    multiple
+                    style={{ display: 'none' }}
+                    onChange={handleUploadPresentationFile}
+                  />
+                  <button
+                    type="button"
+                    className="hly-mini-btn hly-mini-btn--primary"
+                    style={{ fontSize: 11, padding: '3px 8px', fontWeight: 700 }}
+                    title="Cargar presentación de PowerPoint (.pptx) o archivo PDF"
+                    onClick={() => presentationFileInputRef.current?.click()}
+                  >
+                    ➕ Cargar Diapositivas / PDF
+                  </button>
+                </div>
+              </div>
+              <div className="hly-SubToolbar">
+                <input
+                  type="text"
+                  className="input"
+                  value={presentationSearch}
+                  onChange={(e) => setPresentationSearch(e.target.value)}
+                  placeholder="Filtrar presentaciones por título..."
+                  aria-label="Filtrar presentaciones y diapositivas"
+                />
+              </div>
+              <div className="hly-grid-body" style={{ flex: 1, overflowY: 'auto' }}>
+                {filteredPresentations.length === 0 ? (
+                  <div className="hly-empty-box" style={{ padding: 24, textAlign: 'center' }}>
+                    <p style={{ fontSize: 13, marginBottom: 12 }}>
+                      No hay diapositivas o documentos PDF en el sistema.
+                    </p>
+                    <button
+                      type="button"
+                      className="button button--primary"
+                      onClick={() => presentationFileInputRef.current?.click()}
+                    >
+                      ➕ Cargar PowerPoint (.pptx) o PDF
+                    </button>
+                  </div>
+                ) : (
+                  <div className="hly-table-list" role="list">
+                    {filteredPresentations.map((item, idx) => {
+                      const isSelected = selectedDocDeck?.id === item.id
+                      const isLive = live?.deckTitle === item.title
+                      return (
+                        <div
+                          key={item.id}
+                          role="listitem"
+                          className={`hly-song-row${isSelected ? ' hly-song-row--selected' : ''}${isLive ? ' hly-song-row--live' : ''}`}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => {
+                            setSelectedDocId(item.id)
+                            setOpenDocTabs((prev) => {
+                              const exists = prev.some((d) => d.title === item.title)
+                              if (!exists) {
+                                return [...prev, { id: item.id, title: item.title, slides: item.slides }]
+                              }
+                              return prev
+                            })
+                          }}
+                          onDoubleClick={() => projectPresentationImmediately(item, true)}
+                        >
+                          <span className="hly-song-row__idx">{String(idx + 1).padStart(2, '0')}</span>
+                          <span style={{ fontSize: 16 }}>{item.kind === 'pdf' ? '📄' : '📊'}</span>
+                          <span className="hly-song-row__title" style={{ flex: 1 }}>
+                            <strong>{item.title}</strong>
+                            <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)' }}>
+                              {item.subtitle}
+                            </span>
+                          </span>
+                          <div className="btn-row">
+                            <button
+                              type="button"
+                              className="hly-icon-btn"
+                              title="Proyectar todas las diapositivas en vivo (doble clic)"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                projectPresentationImmediately(item, true)
+                              }}
+                            >
+                              ▶
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           {activeTab === 'images' && (
             <>
@@ -683,8 +1053,8 @@ export function HomePage({ app }: HomePageProps) {
 
         {/* PANEL CENTRAL DERECHO: PESTAÑAS ABIERTAS + PÁRRAFOS EN PREVISUALIZACIÓN */}
         <div className="hly-panel hly-panel--flex">
-          {openSongTabIds.length > 0 && (
-            <div className="hly-open-docs-bar" role="tablist" aria-label="Canciones abiertas en previsualización">
+          {(openSongTabIds.length > 0 || openDocTabs.length > 0) && (
+            <div className="hly-open-docs-bar" role="tablist" aria-label="Elementos abiertos en previsualización">
               {openSongTabIds.map((id) => {
                 const s = app.songs.find((item) => item.id === id)
                 if (!s) return null
@@ -706,6 +1076,31 @@ export function HomePage({ app }: HomePageProps) {
                       className="hly-doc-tab__close"
                       title="Cerrar pestaña"
                       onClick={() => closeSongTab(id)}
+                    >
+                      ×
+                    </button>
+                  </div>
+                )
+              })}
+              {openDocTabs.map((doc) => {
+                const isSelected = activeTab === 'presentation' && (selectedDocId === doc.id || selectedDocId === doc.title)
+                return (
+                  <div key={doc.id} className={`hly-doc-tab${isSelected ? ' hly-doc-tab--active' : ''}`}>
+                    <button
+                      type="button"
+                      className="hly-doc-tab__btn"
+                      onClick={() => {
+                        setSelectedDocId(doc.id)
+                        setActiveTab('presentation')
+                      }}
+                    >
+                      📄 {doc.title}
+                    </button>
+                    <button
+                      type="button"
+                      className="hly-doc-tab__close"
+                      title="Cerrar pestaña"
+                      onClick={() => closeDocTab(doc.id)}
                     >
                       ×
                     </button>
@@ -750,6 +1145,7 @@ export function HomePage({ app }: HomePageProps) {
                   key={slide.id}
                   type="button"
                   role="listitem"
+                  ref={isLiveSlide ? activeSlideRef : undefined}
                   className={`hly-slide-row hly-slide-row--preview${
                     !showTagsColumn ? ' hly-slide-row--no-tag' : ''
                   }${isLiveSlide ? ' hly-slide-row--active' : ''}`}
@@ -760,19 +1156,35 @@ export function HomePage({ app }: HomePageProps) {
                   {showTagsColumn && <span className={stanzaTagClass(slide.label)}>{slide.label}</span>}
                   <span className="hly-slide-row__text">
                     {slide.imageUrl ? (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, width: '100%' }}>
                         {slide.mediaKind === 'video' || isVideoUrl(slide.imageUrl) ? (
                           <video
                             src={resolveMediaVideoUrl(slide.imageUrl)}
                             muted
                             playsInline
                             preload="metadata"
-                            style={{ width: 48, height: 32, objectFit: 'cover', borderRadius: 3, border: '1px solid #444', background: '#000' }}
+                            style={{ width: 54, height: 36, objectFit: 'cover', borderRadius: 4, border: '1px solid #444', background: '#000', flexShrink: 0 }}
                           />
                         ) : (
-                          <img src={slide.imageUrl} alt={slide.label} style={{ height: 32, borderRadius: 3, border: '1px solid #444' }} />
+                          <img
+                            src={slide.imageUrl}
+                            alt={slide.label}
+                            style={{ width: 54, height: 36, objectFit: 'contain', borderRadius: 4, border: '1px solid #444', background: '#111', flexShrink: 0 }}
+                          />
                         )}
-                        <span>[{slide.mediaKind === 'video' || isVideoUrl(slide.imageUrl) ? 'Vídeo' : 'Imagen'} a pantalla completa: {slide.label}]</span>
+                        <span style={{ display: 'flex', flexDirection: 'column', gap: 2, overflow: 'hidden', textAlign: 'left' }}>
+                          <strong style={{ fontSize: 12, color: 'var(--text)' }}>{slide.label}</strong>
+                          {slide.footer && (
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {slide.footer}
+                            </span>
+                          )}
+                          {slide.lines.length > 0 && (
+                            <span style={{ fontSize: 11, color: 'var(--text-dim)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {slide.lines.slice(0, 2).join(' ')}
+                            </span>
+                          )}
+                        </span>
                       </span>
                     ) : (
                       slide.lines.map((line, lineIdx) => (

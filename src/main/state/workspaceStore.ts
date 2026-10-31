@@ -128,6 +128,13 @@ export class WorkspaceStore {
                 item.value = `lumen-media://local/${encodeURIComponent(newFilePath.replace(/\\/g, '/'))}`
                 repaired = true
               }
+            } else if (!extname(filePath)) {
+              const targetExt = item.kind === 'video' ? '.mp4' : '.png'
+              const newFilePath = `${filePath}${targetExt}`
+              if (existsSync(newFilePath)) {
+                item.value = `lumen-media://local/${encodeURIComponent(newFilePath.replace(/\\/g, '/'))}`
+                repaired = true
+              }
             }
           } catch {
             // ignore
@@ -354,10 +361,14 @@ export class WorkspaceStore {
           let sourceDiskPath = decodeURIComponent(rawUrl.pathname)
           if (/^\/[a-zA-Z]:/.test(sourceDiskPath)) sourceDiskPath = sourceDiskPath.slice(1)
           sourceDiskPath = sourceDiskPath.replace(/\//g, '\\')
-          const fileName = basename(sourceDiskPath)
-          const targetPath = join(destDir, fileName)
+          const rawExt = extname(sourceDiskPath)
+          const ext = rawExt || (input.kind === 'video' ? '.mp4' : '.png')
+          const baseNoExt = basename(sourceDiskPath, rawExt)
+          const targetPath = join(destDir, `${baseNoExt}${ext}`)
           if (existsSync(sourceDiskPath) && !existsSync(targetPath)) {
             copyFileSync(sourceDiskPath, targetPath)
+            finalValue = `lumen-media://local/${encodeURIComponent(targetPath.replace(/\\/g, '/'))}`
+          } else if (existsSync(targetPath)) {
             finalValue = `lumen-media://local/${encodeURIComponent(targetPath.replace(/\\/g, '/'))}`
           }
         } catch {
@@ -388,7 +399,8 @@ export class WorkspaceStore {
       kind: input.kind,
       value: finalValue,
       accentColor: input.accentColor ?? (input.kind === 'video' ? '#38bdf8' : '#f2b84b'),
-      ...(input.category ? { category: input.category } : {})
+      ...(input.category ? { category: input.category } : {}),
+      ...(input.slides ? { slides: input.slides } : {})
     }
     this.media.unshift(bg)
     this.saveToDisk()

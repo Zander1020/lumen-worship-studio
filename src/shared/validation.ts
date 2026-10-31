@@ -464,6 +464,9 @@ export function parseMediaBackgroundInput(input: unknown): MediaBackgroundInput 
   const result: MediaBackgroundInput = { name, kind: kind as BackgroundKind, value }
   if (accentColor) result.accentColor = accentColor
   if (category) result.category = category
+  if (Array.isArray(input['slides'])) {
+    result.slides = input['slides'].map((s) => parsePresentationSlide(s))
+  }
   return result
 }
 

@@ -1,6 +1,6 @@
 import { app, type BrowserWindow, Menu, net, protocol, screen, session } from 'electron'
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { closeSync, copyFileSync, existsSync, openSync, readSync } from 'node:fs'
+import { extname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { IpcChannels, type AppInfo } from '../shared/ipc'
 import { registerIpcHandlers } from './ipc/registerIpcHandlers'
@@ -88,17 +88,44 @@ function bootstrap(): void {
           if (/^\/[a-zA-Z]:/.test(rawPath)) {
             rawPath = rawPath.slice(1)
           }
-          // Si el archivo en disco no existe pero existe con extensión .mp4 o .png, resolverlo
-          if (!existsSync(rawPath)) {
+          rawPath = rawPath.replace(/\//g, '\\')
+
+          let effectivePath = rawPath
+          // 1. Si no existe exactamente como viene, resolver con extensiones estándar
+          if (!existsSync(effectivePath)) {
             if (existsSync(`${rawPath}.mp4`)) {
-              rawPath = `${rawPath}.mp4`
+              effectivePath = `${rawPath}.mp4`
             } else if (existsSync(`${rawPath}.webm`)) {
-              rawPath = `${rawPath}.webm`
+              effectivePath = `${rawPath}.webm`
             } else if (existsSync(`${rawPath}.png`)) {
-              rawPath = `${rawPath}.png`
+              effectivePath = `${rawPath}.png`
+            } else if (existsSync(`${rawPath}.jpg`)) {
+              effectivePath = `${rawPath}.jpg`
+            }
+          } else if (!extname(effectivePath)) {
+            // 2. Si existe pero no tiene extensión, verificar o clonar a .mp4 si es video
+            if (existsSync(`${effectivePath}.mp4`)) {
+              effectivePath = `${effectivePath}.mp4`
+            } else {
+              try {
+                const buf = Buffer.alloc(16)
+                const fd = openSync(effectivePath, 'r')
+                readSync(fd, buf, 0, 16, 0)
+                closeSync(fd)
+                if (buf.includes(Buffer.from('ftyp'))) {
+                  const mp4Path = `${effectivePath}.mp4`
+                  if (!existsSync(mp4Path)) {
+                    copyFileSync(effectivePath, mp4Path)
+                  }
+                  effectivePath = mp4Path
+                }
+              } catch {
+                // ignore
+              }
             }
           }
-          return net.fetch(pathToFileURL(rawPath).toString())
+
+          return net.fetch(pathToFileURL(effectivePath).toString())
         } catch (e) {
           console.error('[protocol] Error al servir lumen-media:', e)
           return new Response('Not Found', { status: 404 })

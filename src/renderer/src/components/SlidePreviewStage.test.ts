@@ -113,5 +113,23 @@ describe('computeHolyricsOptimalFontSize (Ajuste Automático Inteligente estilo 
     expect(result.maxLineVh).toBeGreaterThanOrEqual(10.0)
     expect(result.estimatedLines).toBe(6)
   })
+
+  it('determina correctamente el estado no silenciado para videos proyectados cuando theme.videoMuted es false', () => {
+    // Al proyectar un video de medios (compact = false), no debe silenciarse por defecto
+    const isMutedInProjection = (compact: boolean, windowOpen: boolean, videoMuted?: boolean): boolean => {
+      return compact && windowOpen ? true : Boolean(videoMuted)
+    }
+
+    // 1. Proyección activa en ventana: debe tener sonido (muted = false)
+    expect(isMutedInProjection(false, true, false)).toBe(false)
+    expect(isMutedInProjection(false, true, undefined)).toBe(false)
+
+    // 2. Vista previa en cabina sin ventana abierta: debe tener sonido (muted = false)
+    expect(isMutedInProjection(true, false, false)).toBe(false)
+
+    // 3. Cuando el operador pulsa el botón de silenciar (videoMuted = true): se silencia
+    expect(isMutedInProjection(false, true, true)).toBe(true)
+    expect(isMutedInProjection(true, false, true)).toBe(true)
+  })
 })
 

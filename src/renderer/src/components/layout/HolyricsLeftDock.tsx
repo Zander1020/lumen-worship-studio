@@ -1,5 +1,6 @@
 import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
 import type { MediaBackground } from '../../../../shared/ipc'
+import type { PresentationSlide, ScheduleItem } from '../../../../shared/models'
 import { isVideoUrl } from '../../../../shared/slideHelpers'
 import { convertPdfToSlides, convertPptxToSlides } from '../../features/home/presentationDocHelpers'
 import type { UseAppStatus } from '../../hooks/useAppStatus'
@@ -8,6 +9,8 @@ export interface HolyricsLeftDockProps {
   app: UseAppStatus
 }
 
+type LeftDockTab = 'culto' | 'medios'
+
 /**
  * Columna izquierda de cabina: Panel de MEDIOS del culto.
  * Muestra exclusivamente imágenes y vídeos subidos por el usuario (WhatsApp, anuncios, etc.),
@@ -15,11 +18,35 @@ export interface HolyricsLeftDockProps {
  */
 export function HolyricsLeftDock({ app }: HolyricsLeftDockProps) {
   const live = app.status?.projection.live
+  const [leftTab, setLeftTab] = useState<LeftDockTab>('culto')
+  const [scheduleSearch, setScheduleSearch] = useState('')
   const [mediaSearch, setMediaSearch] = useState('')
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: MediaBackground } | null>(null)
   const [previewModalItem, setPreviewModalItem] = useState<MediaBackground | null>(null)
   const mediaFileInputRef = useRef<HTMLInputElement | null>(null)
+
+  const filteredSchedule = useMemo(() => {
+    const q = scheduleSearch.trim().toLowerCase()
+    if (!q) return app.schedule
+    return app.schedule.filter(
+      (item) => item.title.toLowerCase().includes(q) || item.subtitle.toLowerCase().includes(q)
+    )
+  }, [app.schedule, scheduleSearch])
+
+  const projectScheduleItem = (item: ScheduleItem, openWindow = true): void => {
+    if (item.slides.length === 0) return
+    void app.loadProjectionDeck({
+      deckTitle: item.title,
+      slides: item.slides,
+      startIndex: 0,
+      openWindow
+    })
+    void app.setProjectionMode('live')
+    if (openWindow && !app.status?.projection.windowOpen) {
+      void app.openProjection({ target: 'auto' })
+    }
+  }
 
   // Cerrar menú contextual al hacer clic en cualquier parte
   useEffect(() => {
@@ -53,7 +80,8 @@ export function HolyricsLeftDock({ app }: HolyricsLeftDockProps) {
               name: deck.title,
               kind: 'image',
               value: deck.slides[0]?.imageUrl || '',
-              category: 'Culto'
+              category: 'Culto',
+              slides: deck.slides
             })
             void app.addScheduleItem({
               kind: 'announcement',
@@ -80,7 +108,8 @@ export function HolyricsLeftDock({ app }: HolyricsLeftDockProps) {
               name: deck.title,
               kind: 'image',
               value: deck.slides[0]?.imageUrl || '',
-              category: 'Culto'
+              category: 'Culto',
+              slides: deck.slides
             })
             void app.addScheduleItem({
               kind: 'announcement',
@@ -150,26 +179,43 @@ export function HolyricsLeftDock({ app }: HolyricsLeftDockProps) {
         mediaVal = `data:video/mp4;base64,${mediaVal.slice(comma + 1)}`
       }
     }
+
+    // Si tiene diapositivas asociadas (PDF / PPTX) o existe en el cronograma
+    const scheduleMatch = app.schedule.find(
+      (s) =>
+        s.title.toLowerCase().includes(item.name.toLowerCase()) ||
+        item.name.toLowerCase().includes(s.title.toLowerCase().replace(/^(pdf|powerpoint):\s*/i, ''))
+    )
+    const deckSlides: PresentationSlide[] =
+      item.slides && item.slides.length > 0
+        ? item.slides
+        : scheduleMatch && scheduleMatch.slides && scheduleMatch.slides.length > 0
+          ? scheduleMatch.slides
+          : [
+              {
+                id: `slide-media-${item.id}`,
+                sourceKind: 'custom',
+                sourceTitle: item.name,
+                label: item.name,
+                lines: [],
+                footer: '',
+                imageUrl: mediaVal,
+                mediaKind: isVideo ? 'video' : 'image'
+              }
+            ]
+
     void app.loadProjectionDeck({
       deckTitle: item.name,
-      slides: [
-        {
-          id: `slide-media-${item.id}`,
-          sourceKind: 'custom',
-          sourceTitle: item.name,
-          label: item.name,
-          lines: [],
-          footer: '',
-          imageUrl: mediaVal,
-          mediaKind: item.kind === 'video' ? 'video' : 'image'
-        }
-      ],
+      slides: deckSlides,
       startIndex: 0,
       openWindow
     })
-    void app.updateProjectionTheme({
-      videoPlaying: true
-    })
+    if (isVideo) {
+      void app.updateProjectionTheme({
+        videoPlaying: true,
+        videoMuted: false
+      })
+    }
     void app.setProjectionMode('live')
     if (openWindow && !app.status?.projection.windowOpen) {
       void app.openProjection({ target: 'auto' })
@@ -187,23 +233,30 @@ export function HolyricsLeftDock({ app }: HolyricsLeftDockProps) {
             alignItems: 'center',
             justifyContent: 'space-between',
             flexWrap: 'nowrap',
-            gap: 6,
+            gap: 4,
             padding: '6px 8px'
           }}
         >
-          <span
-            className="hly-panel__title"
-            style={{
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              fontSize: 11,
-              fontWeight: 800
-            }}
-            title="Vídeos e imágenes subidas por el usuario"
-          >
-            🎬 MEDIOS ({filteredMedia.length})
-          </span>
+          <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+            <button
+              type="button"
+              className={`hly-mini-btn${leftTab === 'culto' ? ' hly-mini-btn--active' : ''}`}
+              style={{ fontSize: 10.5, fontWeight: 700, padding: '3px 6px' }}
+              onClick={() => setLeftTab('culto')}
+              title="Cronograma del culto (canciones, biblia, diapositivas)"
+            >
+              📋 CULTO ({app.schedule.length})
+            </button>
+            <button
+              type="button"
+              className={`hly-mini-btn${leftTab === 'medios' ? ' hly-mini-btn--active' : ''}`}
+              style={{ fontSize: 10.5, fontWeight: 700, padding: '3px 6px' }}
+              onClick={() => setLeftTab('medios')}
+              title="Vídeos e imágenes subidas por el usuario"
+            >
+              🎬 MEDIOS ({filteredMedia.length})
+            </button>
+          </div>
           <div
             className="btn-row"
             style={{
@@ -242,7 +295,7 @@ export function HolyricsLeftDock({ app }: HolyricsLeftDockProps) {
             <button
               type="button"
               className="hly-mini-btn"
-              title="Añadir imágenes o vídeos desde el equipo"
+              title="Añadir imágenes, vídeos, PDF o PowerPoint (.pptx)"
               onClick={() => mediaFileInputRef.current?.click()}
             >
               ➕
@@ -250,121 +303,217 @@ export function HolyricsLeftDock({ app }: HolyricsLeftDockProps) {
           </div>
         </div>
 
-        <div className="hly-SubToolbar" style={{ padding: '4px 6px' }}>
-          <input
-            type="text"
-            className="input"
-            value={mediaSearch}
-            onChange={(e) => setMediaSearch(e.target.value)}
-            placeholder="Filtrar imagen por nombre..."
-            aria-label="Filtrar imágenes del culto"
-            style={{ fontSize: 11, padding: '3px 6px', width: '100%' }}
-          />
-        </div>
+        {leftTab === 'culto' ? (
+          <>
+            <div className="hly-SubToolbar" style={{ padding: '4px 6px' }}>
+              <input
+                type="text"
+                className="input"
+                value={scheduleSearch}
+                onChange={(e) => setScheduleSearch(e.target.value)}
+                placeholder="Filtrar orden del culto..."
+                aria-label="Filtrar orden del culto"
+                style={{ fontSize: 11, padding: '3px 6px', width: '100%' }}
+              />
+            </div>
+            <div className="hly-playlist-body" style={{ flex: 1, overflowY: 'auto' }}>
+              {filteredSchedule.length === 0 ? (
+                <div className="hly-empty-box" style={{ padding: 14 }}>
+                  El cronograma está vacío. Carga tus alabanzas, lecturas o diapositivas.
+                </div>
+              ) : (
+                <div className="hly-table-list" role="list">
+                  {filteredSchedule.map((item, idx) => {
+                    const isActive = live?.deckTitle === item.title
+                    const isPresentation =
+                      item.title.toLowerCase().includes('pdf') ||
+                      item.title.toLowerCase().includes('powerpoint') ||
+                      item.slides.some((s) => s.label.toLowerCase().includes('página') || s.label.toLowerCase().includes('diapositiva'))
+                    return (
+                      <div
+                        key={item.id}
+                        role="listitem"
+                        className={`hly-playlist-row${isActive ? ' hly-playlist-row--active' : ''}`}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <button
+                          type="button"
+                          className="hly-playlist-row__main"
+                          title="1 clic: Proyectar todas las diapositivas · Teclas flecha para cambiar"
+                          onClick={() => projectScheduleItem(item, true)}
+                          onDoubleClick={() => projectScheduleItem(item, true)}
+                        >
+                          <span className="hly-playlist-row__idx">
+                            {String(idx + 1).padStart(2, '0')}
+                          </span>
+                          <span
+                            style={{
+                              width: 28,
+                              height: 20,
+                              borderRadius: 3,
+                              overflow: 'hidden',
+                              background: '#1a2234',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                              border: '1px solid var(--border)',
+                              fontSize: 11
+                            }}
+                          >
+                            {isPresentation ? (item.title.toLowerCase().includes('pdf') ? '📄' : '📊') : item.kind === 'song' ? '♪' : item.kind === 'bible' ? '📖' : '📢'}
+                          </span>
+                          <span className="hly-playlist-row__info">
+                            <span className="hly-playlist-row__title">{item.title}</span>
+                            <span className="hly-playlist-row__sub">
+                              {item.subtitle || `${item.slides.length} diapositivas`}
+                            </span>
+                          </span>
+                        </button>
+                        <div className="hly-playlist-row__actions">
+                          <button
+                            type="button"
+                            className="hly-icon-btn"
+                            title="Proyectar en vivo (doble clic)"
+                            onClick={() => projectScheduleItem(item, true)}
+                          >
+                            ▶
+                          </button>
+                          <button
+                            type="button"
+                            className="hly-icon-btn hly-icon-btn--danger"
+                            title="Quitar del cronograma"
+                            onClick={() => void app.removeScheduleItem(item.id)}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="hly-SubToolbar" style={{ padding: '4px 6px' }}>
+              <input
+                type="text"
+                className="input"
+                value={mediaSearch}
+                onChange={(e) => setMediaSearch(e.target.value)}
+                placeholder="Filtrar imagen por nombre..."
+                aria-label="Filtrar imágenes del culto"
+                style={{ fontSize: 11, padding: '3px 6px', width: '100%' }}
+              />
+            </div>
 
-        <div className="hly-playlist-body" style={{ flex: 1, overflowY: 'auto' }}>
-          {filteredMedia.length === 0 ? (
-            <div className="hly-empty-box" style={{ padding: 14 }}>
-              No hay medios subidos aún. Usa el botón <strong>➕</strong> o <strong>📁</strong> para cargar tus imágenes y vídeos para el culto.
-            </div>
-          ) : (
-            <div className="hly-table-list" role="list">
-              {filteredMedia.map((item, idx) => {
-                const isActive = live?.deckTitle === item.name
-                const isSelected = selectedMediaId === item.id
-                return (
-                  <div
-                    key={item.id}
-                    role="listitem"
-                    className={`hly-playlist-row${isActive ? ' hly-playlist-row--active' : ''}${isSelected ? ' hly-playlist-row--selected' : ''}`}
-                    style={{ cursor: 'pointer' }}
-                    onContextMenu={(e) => {
-                      e.preventDefault()
-                      setSelectedMediaId(item.id)
-                      setContextMenu({ x: e.clientX, y: e.clientY, item })
-                    }}
-                  >
-                    <button
-                      type="button"
-                      className="hly-playlist-row__main"
-                      title="1 clic: Proyectar | Clic derecho: Vista previa sin proyectar"
-                      onClick={() => {
-                        setSelectedMediaId(item.id)
-                        projectMedia(item, true)
-                      }}
-                      onDoubleClick={() => projectMedia(item, true)}
-                    >
-                      <span className="hly-playlist-row__idx">
-                        {String(idx + 1).padStart(2, '0')}
-                      </span>
-                      <span
-                        style={{
-                          width: 28,
-                          height: 20,
-                          borderRadius: 3,
-                          overflow: 'hidden',
-                          background: '#111',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                          border: '1px solid var(--border)'
+            <div className="hly-playlist-body" style={{ flex: 1, overflowY: 'auto' }}>
+              {filteredMedia.length === 0 ? (
+                <div className="hly-empty-box" style={{ padding: 14 }}>
+                  No hay medios subidos aún. Usa el botón <strong>➕</strong> o <strong>📁</strong> para cargar tus imágenes y vídeos para el culto.
+                </div>
+              ) : (
+                <div className="hly-table-list" role="list">
+                  {filteredMedia.map((item, idx) => {
+                    const isActive = live?.deckTitle === item.name
+                    const isSelected = selectedMediaId === item.id
+                    return (
+                      <div
+                        key={item.id}
+                        role="listitem"
+                        className={`hly-playlist-row${isActive ? ' hly-playlist-row--active' : ''}${isSelected ? ' hly-playlist-row--selected' : ''}`}
+                        style={{ cursor: 'pointer' }}
+                        onContextMenu={(e) => {
+                          e.preventDefault()
+                          setSelectedMediaId(item.id)
+                          setContextMenu({ x: e.clientX, y: e.clientY, item })
                         }}
                       >
-                        {item.kind === 'video' ? (
-                          <span style={{ fontSize: 10 }}>🎬</span>
-                        ) : item.value.startsWith('data:image') || item.value.startsWith('http') || item.value.startsWith('lumen-media:') ? (
-                          <img
-                            src={item.value}
-                            alt=""
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          />
-                        ) : (
-                          <span style={{ fontSize: 10 }}>🖼</span>
-                        )}
-                      </span>
-                      <span className="hly-playlist-row__info">
-                        <span className="hly-playlist-row__title">{item.name}</span>
-                        <span className="hly-playlist-row__sub">
-                          {item.kind === 'video' ? 'Vídeo' : 'Imagen'} {item.category ? `· ${item.category}` : ''}
-                        </span>
-                      </span>
-                    </button>
-                    <div className="hly-playlist-row__actions">
-                      <button
-                        type="button"
-                        className="hly-icon-btn"
-                        title="Vista previa sin proyectar"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setPreviewModalItem(item)
-                        }}
-                      >
-                        👁
-                      </button>
-                      <button
-                        type="button"
-                        className="hly-icon-btn"
-                        title="Proyectar en vivo (doble clic)"
-                        onClick={() => projectMedia(item, true)}
-                      >
-                        ▶
-                      </button>
-                      <button
-                        type="button"
-                        className="hly-icon-btn hly-icon-btn--danger"
-                        title="Eliminar imagen"
-                        onClick={() => void app.deleteMedia(item.id)}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
+                        <button
+                          type="button"
+                          className="hly-playlist-row__main"
+                          title="1 clic: Proyectar | Clic derecho: Vista previa sin proyectar"
+                          onClick={() => {
+                            setSelectedMediaId(item.id)
+                            projectMedia(item, true)
+                          }}
+                          onDoubleClick={() => projectMedia(item, true)}
+                        >
+                          <span className="hly-playlist-row__idx">
+                            {String(idx + 1).padStart(2, '0')}
+                          </span>
+                          <span
+                            style={{
+                              width: 28,
+                              height: 20,
+                              borderRadius: 3,
+                              overflow: 'hidden',
+                              background: '#111',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                              border: '1px solid var(--border)'
+                            }}
+                          >
+                            {item.kind === 'video' ? (
+                              <span style={{ fontSize: 10 }}>🎬</span>
+                            ) : item.value.startsWith('data:image') || item.value.startsWith('http') || item.value.startsWith('lumen-media:') ? (
+                              <img
+                                src={item.value}
+                                alt=""
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              />
+                            ) : (
+                              <span style={{ fontSize: 10 }}>🖼</span>
+                            )}
+                          </span>
+                          <span className="hly-playlist-row__info">
+                            <span className="hly-playlist-row__title">{item.name}</span>
+                            <span className="hly-playlist-row__sub">
+                              {item.kind === 'video' ? 'Vídeo' : 'Imagen'} {item.category ? `· ${item.category}` : ''}
+                            </span>
+                          </span>
+                        </button>
+                        <div className="hly-playlist-row__actions">
+                          <button
+                            type="button"
+                            className="hly-icon-btn"
+                            title="Vista previa sin proyectar"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setPreviewModalItem(item)
+                            }}
+                          >
+                            👁
+                          </button>
+                          <button
+                            type="button"
+                            className="hly-icon-btn"
+                            title="Proyectar en vivo (doble clic)"
+                            onClick={() => projectMedia(item, true)}
+                          >
+                            ▶
+                          </button>
+                          <button
+                            type="button"
+                            className="hly-icon-btn hly-icon-btn--danger"
+                            title="Eliminar imagen"
+                            onClick={() => void app.deleteMedia(item.id)}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
 
       {/* MENÚ CONTEXTUAL AL HACER CLIC DERECHO */}
@@ -493,7 +642,13 @@ export function HolyricsLeftDock({ app }: HolyricsLeftDockProps) {
                   controls
                   autoPlay
                   loop
+                  playsInline
                   style={{ maxWidth: '100%', maxHeight: '55vh', objectFit: 'contain' }}
+                  onCanPlay={(e) => {
+                    const v = e.currentTarget
+                    v.muted = false
+                    v.volume = 1.0
+                  }}
                 />
               ) : (
                 <img

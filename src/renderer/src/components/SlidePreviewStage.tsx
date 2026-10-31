@@ -548,7 +548,7 @@ export function SlidePreviewStage({
   clock,
   displayCount,
   compact = false,
-  windowOpen: _windowOpen = false,
+  windowOpen = false,
   onVideoProgress
 }: SlidePreviewStageProps) {
   const { mode, slides, currentIndex, theme, churchName, welcomeSubtitle, showClockOnLogo } = live
@@ -601,24 +601,27 @@ export function SlidePreviewStage({
   useEffect(() => {
     const vid = slideVideoRef.current
     if (!vid || !isSlideVideo) return
-    const shouldMute = compact ? true : Boolean(theme.videoMuted)
+    const shouldMute = compact && windowOpen ? true : Boolean(theme.videoMuted)
     vid.muted = shouldMute
+    vid.volume = 1.0
     if (theme.videoPlaying === false) {
       vid.pause()
     } else {
-      void vid.play().catch(() => {
-        // Fallback si el navegador requiere interacción inicial
-        vid.muted = true
-        void vid.play().catch(() => undefined)
-      })
+      const playPromise = vid.play()
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn('[SlideVideo] Playback waiting or interrupted:', err)
+        })
+      }
     }
-  }, [theme.videoPlaying, isSlideVideo, slideVideoSrc, compact, theme.videoMuted])
+  }, [theme.videoPlaying, isSlideVideo, slideVideoSrc, compact, windowOpen, theme.videoMuted])
 
   useEffect(() => {
     const vid = slideVideoRef.current
     if (!vid || !isSlideVideo) return
-    vid.muted = compact ? true : Boolean(theme.videoMuted)
-  }, [compact, theme.videoMuted, isSlideVideo])
+    vid.muted = compact && windowOpen ? true : Boolean(theme.videoMuted)
+    vid.volume = 1.0
+  }, [compact, windowOpen, theme.videoMuted, isSlideVideo])
 
   useEffect(() => {
     const vid = slideVideoRef.current
@@ -626,14 +629,17 @@ export function SlidePreviewStage({
     if (theme.videoRestartTime === lastSlideRestartRef.current) return
     lastSlideRestartRef.current = theme.videoRestartTime
     vid.currentTime = 0
-    vid.muted = compact ? true : Boolean(theme.videoMuted)
+    vid.muted = compact && windowOpen ? true : Boolean(theme.videoMuted)
+    vid.volume = 1.0
     if (theme.videoPlaying !== false) {
-      void vid.play().catch(() => {
-        vid.muted = true
-        void vid.play().catch(() => undefined)
-      })
+      const playPromise = vid.play()
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn('[SlideVideo] Restart play error:', err)
+        })
+      }
     }
-  }, [theme.videoRestartTime, theme.videoPlaying, compact, theme.videoMuted])
+  }, [theme.videoRestartTime, theme.videoPlaying, compact, windowOpen, theme.videoMuted])
 
   useEffect(() => {
     const vid = slideVideoRef.current
@@ -1121,7 +1127,7 @@ export function SlidePreviewStage({
             src={slideVideoSrc}
             autoPlay={theme.videoPlaying !== false}
             loop={theme.videoLoop !== false}
-            muted={compact ? true : Boolean(theme.videoMuted)}
+            muted={compact && windowOpen ? true : Boolean(theme.videoMuted)}
             playsInline
             preload="auto"
             onTimeUpdate={(e) => {
@@ -1132,18 +1138,23 @@ export function SlidePreviewStage({
             }}
             onLoadedMetadata={(e) => {
               const v = e.currentTarget
+              v.volume = 1.0
+              v.muted = compact && windowOpen ? true : Boolean(theme.videoMuted)
               if (onVideoProgress && !isNaN(v.duration) && v.duration > 0) {
                 onVideoProgress(v.currentTime, v.duration)
               }
             }}
             onCanPlay={(e) => {
               const v = e.currentTarget
-              v.muted = compact ? true : Boolean(theme.videoMuted)
+              v.volume = 1.0
+              v.muted = compact && windowOpen ? true : Boolean(theme.videoMuted)
               if (theme.videoPlaying !== false) {
-                void v.play().catch(() => {
-                  v.muted = true
-                  void v.play().catch(() => undefined)
-                })
+                const playPromise = v.play()
+                if (playPromise !== undefined) {
+                  playPromise.catch((err) => {
+                    console.warn('[SlideVideo] onCanPlay play error:', err)
+                  })
+                }
               }
             }}
             style={{
