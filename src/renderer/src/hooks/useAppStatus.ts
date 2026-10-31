@@ -9,6 +9,7 @@ import type {
   HolyricsImportItem,
   MediaBackground,
   MediaBackgroundInput,
+  PresentationDeck,
   ProjectionDisplayMode,
   ProjectionGoToSlideRequest,
   ProjectionLoadDeckRequest,
@@ -67,6 +68,12 @@ export interface UseAppStatus {
   openBackgroundsFolder?: () => Promise<void>
   reloadBackgrounds?: () => Promise<void>
 
+  presentations: PresentationDeck[]
+  savePresentation: (deck: PresentationDeck) => Promise<void>
+  deletePresentation: (id: string) => Promise<void>
+  openSlidesFolder: () => Promise<void>
+  reloadSlides: () => Promise<void>
+
   startRemoteServer: () => Promise<void>
   stopRemoteServer: () => Promise<void>
   regenerateRemotePin: () => Promise<void>
@@ -87,6 +94,7 @@ export function useAppStatus(): UseAppStatus {
   const [songs, setSongs] = useState<Song[]>([])
   const [schedule, setSchedule] = useState<ScheduleItem[]>([])
   const [media, setMedia] = useState<MediaBackground[]>([])
+  const [presentations, setPresentations] = useState<PresentationDeck[]>([])
   const [bibleBooks, setBibleBooks] = useState<BibleBookSummary[]>([])
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [remoteInfo, setRemoteInfo] = useState<RemoteServerInfo | null>(null)
@@ -119,6 +127,11 @@ export function useAppStatus(): UseAppStatus {
     if (typeof api.listMedia === 'function') {
       void api.listMedia().then((res) => {
         if (active) setMedia(res)
+      })
+    }
+    if (typeof api.listPresentations === 'function') {
+      void api.listPresentations().then((res) => {
+        if (active) setPresentations(res)
       })
     }
     if (typeof api.listBibleBooks === 'function') {
@@ -429,6 +442,63 @@ export function useAppStatus(): UseAppStatus {
     }
   }, [api])
 
+  const savePresentation = useCallback(
+    async (deck: PresentationDeck) => {
+      if (!api || typeof api.savePresentation !== 'function') {
+        setPresentations((prev) => {
+          const idx = prev.findIndex((p) => p.id === deck.id || p.title.toLowerCase() === deck.title.toLowerCase())
+          return idx !== -1 ? prev.map((p, i) => (i === idx ? deck : p)) : [deck, ...prev]
+        })
+        return
+      }
+      try {
+        setPresentations(await api.savePresentation(deck))
+      } catch (err: unknown) {
+        setError(messageOf(err))
+      }
+    },
+    [api]
+  )
+
+  const deletePresentation = useCallback(
+    async (id: string) => {
+      if (!api || typeof api.deletePresentation !== 'function') {
+        setPresentations((prev) => prev.filter((p) => p.id !== id))
+        return
+      }
+      try {
+        setPresentations(await api.deletePresentation(id))
+      } catch (err: unknown) {
+        setError(messageOf(err))
+      }
+    },
+    [api]
+  )
+
+  const openSlidesFolder = useCallback(async () => {
+    if (!api || typeof api.openSlidesFolder !== 'function') return
+    try {
+      const folderPath = await api.openSlidesFolder()
+      setNotice(`Carpeta de diapositivas abierta: ${folderPath}`)
+    } catch (err: unknown) {
+      setError(messageOf(err))
+    }
+  }, [api])
+
+  const reloadSlides = useCallback(async () => {
+    if (!api) return
+    try {
+      if (typeof api.reloadSlides === 'function') {
+        setPresentations(await api.reloadSlides())
+        setNotice('Diapositivas actualizadas.')
+      } else if (typeof api.listPresentations === 'function') {
+        setPresentations(await api.listPresentations())
+      }
+    } catch (err: unknown) {
+      setError(messageOf(err))
+    }
+  }, [api])
+
   const startRemoteServer = useCallback(async () => {
     if (!api || typeof api.startRemoteServer !== 'function') return
     setBusy(true)
@@ -535,6 +605,11 @@ export function useAppStatus(): UseAppStatus {
     reloadMedia,
     openBackgroundsFolder,
     reloadBackgrounds,
+    presentations,
+    savePresentation,
+    deletePresentation,
+    openSlidesFolder,
+    reloadSlides,
     startRemoteServer,
     stopRemoteServer,
     regenerateRemotePin,

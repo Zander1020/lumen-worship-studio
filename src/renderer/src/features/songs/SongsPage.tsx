@@ -10,6 +10,7 @@ import {
   transposeChordText
 } from '../../../../shared/slideHelpers'
 import type { UseAppStatus } from '../../hooks/useAppStatus'
+import { ConfirmDeleteModal } from '../../components/ConfirmDeleteModal'
 
 export interface SongsPageProps {
   app: UseAppStatus
@@ -66,6 +67,19 @@ export function SongsPage({ app }: SongsPageProps) {
     x: number
     y: number
   } | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean
+    title: string
+    itemName: string
+    itemType: string
+    onConfirm: () => void
+  }>({
+    isOpen: false,
+    title: '',
+    itemName: '',
+    itemType: '',
+    onConfirm: () => {}
+  })
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -637,7 +651,19 @@ export function SongsPage({ app }: SongsPageProps) {
                     type="button"
                     className="hly-mini-btn"
                     style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}
-                    onClick={() => void app.deleteSong(selectedSong.id)}
+                    onClick={() => {
+                      setDeleteConfirm({
+                        isOpen: true,
+                        title: '¿Eliminar alabanza?',
+                        itemName: selectedSong.title,
+                        itemType: 'alabanza del repertorio',
+                        onConfirm: () => {
+                          void app.deleteSong(selectedSong.id)
+                          setSelectedSongId(null)
+                          setDeleteConfirm((prev) => ({ ...prev, isOpen: false }))
+                        }
+                      })
+                    }}
                   >
                     Eliminar
                   </button>
@@ -795,15 +821,33 @@ export function SongsPage({ app }: SongsPageProps) {
             onClick={() => {
               const toDelete = contextMenu.song
               setContextMenu(null)
-              if (window.confirm(`¿Seguro que deseas eliminar la alabanza "${toDelete.title}"?`)) {
-                void app.deleteSong(toDelete.id)
-              }
+              setDeleteConfirm({
+                isOpen: true,
+                title: '¿Eliminar alabanza?',
+                itemName: toDelete.title,
+                itemType: 'alabanza del repertorio',
+                onConfirm: () => {
+                  void app.deleteSong(toDelete.id)
+                  if (selectedSongId === toDelete.id) setSelectedSongId(null)
+                  setDeleteConfirm((prev) => ({ ...prev, isOpen: false }))
+                }
+              })
             }}
           >
             🗑 Eliminar alabanza
           </button>
         </div>
       )}
+
+      {/* Modal elegante de confirmación de eliminación */}
+      <ConfirmDeleteModal
+        isOpen={deleteConfirm.isOpen}
+        title={deleteConfirm.title}
+        itemName={deleteConfirm.itemName}
+        itemType={deleteConfirm.itemType}
+        onConfirm={deleteConfirm.onConfirm}
+        onCancel={() => setDeleteConfirm((prev) => ({ ...prev, isOpen: false }))}
+      />
     </section>
   )
 }

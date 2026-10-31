@@ -157,7 +157,7 @@ body,
 
 .hly-workbench {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 340px;
+  grid-template-columns: 285px minmax(0, 1fr) 340px;
   min-height: 0;
   min-width: 0;
   width: 100%;
@@ -184,13 +184,13 @@ body,
 
 @media (max-width: 1400px) {
   .hly-workbench {
-    grid-template-columns: 235px minmax(0, 1fr) 310px;
+    grid-template-columns: 270px minmax(0, 1fr) 310px;
   }
 }
 
 @media (max-width: 1180px) {
   .hly-workbench {
-    grid-template-columns: 210px minmax(0, 1fr) 280px;
+    grid-template-columns: 250px minmax(0, 1fr) 280px;
   }
 }
 

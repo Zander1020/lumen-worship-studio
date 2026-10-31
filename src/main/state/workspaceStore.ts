@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, dirname, extname, join } from 'node:path'
 import { parseHolyricsCatalogPayload, parseHolyricsMufl } from '../../shared/holyricsCompat'
@@ -16,6 +16,7 @@ import type {
   Song,
   SongInput
 } from '../../shared/ipc'
+import type { PresentationDeck } from '../../shared/models'
 import { createAnnouncementSlide } from '../../shared/slideHelpers'
 import { BibleRepository } from '../data/bibleRepository'
 import {
@@ -30,6 +31,7 @@ interface PersistedWorkspace {
   schedule: ScheduleItem[]
   media: MediaBackground[]
   settings: AppSettings
+  presentations?: PresentationDeck[]
 }
 
 function normalizeText(text: string): string {
@@ -47,17 +49,20 @@ export class WorkspaceStore {
   private songs: Song[]
   private schedule: ScheduleItem[]
   private media: MediaBackground[]
+  private presentations: PresentationDeck[]
   private settings: AppSettings
   private readonly bible = new BibleRepository()
   private readonly filePath: string | undefined
   private readonly mediaDir: string
   private readonly backgroundsDir: string
+  private readonly slidesDir: string
 
   constructor(filePath?: string) {
     this.filePath = filePath
     const baseDir = this.filePath ? dirname(this.filePath) : join(process.cwd(), 'lumen-data')
     this.mediaDir = join(baseDir, 'media')
     this.backgroundsDir = join(baseDir, 'fondos')
+    this.slidesDir = join(baseDir, 'diapositivas')
     try {
       if (!existsSync(this.mediaDir)) {
         mkdirSync(this.mediaDir, { recursive: true })
@@ -65,12 +70,16 @@ export class WorkspaceStore {
       if (!existsSync(this.backgroundsDir)) {
         mkdirSync(this.backgroundsDir, { recursive: true })
       }
+      if (!existsSync(this.slidesDir)) {
+        mkdirSync(this.slidesDir, { recursive: true })
+      }
     } catch {
       // Ignorar fallo de creación si no hay permisos de disco
     }
     const loaded = this.loadFromDisk()
     this.songs = loaded?.songs ?? structuredClone([...DEFAULT_SONGS])
     this.schedule = loaded?.schedule ?? createDefaultSchedule()
+    this.presentations = loaded?.presentations ? structuredClone(loaded.presentations) : []
     if (loaded?.media && loaded.media.length > 0) {
       const existingIds = new Set(loaded.media.map((m) => m.id))
       const missingDefaults = DEFAULT_MEDIA_BACKGROUNDS.filter((m) => !existingIds.has(m.id))
@@ -79,6 +88,41 @@ export class WorkspaceStore {
       this.media = structuredClone([...DEFAULT_MEDIA_BACKGROUNDS])
     }
     this.settings = loaded?.settings ?? structuredClone(DEFAULT_SETTINGS)
+
+    // Aislamiento estricto: Purgar radicalmente cualquier documento (PDF, PPTX, PPT, diapositivas) de Medios
+    const isDocumentItem = (m: MediaBackground): boolean => {
+      if ((m.slides && m.slides.length > 0) || (m as { slides?: unknown[] }).slides !== undefined) return true
+      const lowerName = (m.name || '').toLowerCase()
+      if (/\.(pdf|pptx|ppt|ppsx|pps|potx)($|[?#])/i.test(lowerName) || /^(pdf|powerpoint):/i.test(lowerName)) return true
+      const lowerVal = typeof m.value === 'string' ? m.value.toLowerCase() : ''
+      if (/\.(pdf|pptx|ppt|ppsx|pps|potx)($|[?#])/i.test(lowerVal)) return true
+      if (m.category && ['diapositivas', 'presentaciones', 'documentos', 'pdf'].includes(m.category.toLowerCase())) return true
+      return false
+    }
+
+    let mediaCleaned = false
+    this.media = this.media.filter((m) => {
+      if (isDocumentItem(m)) {
+        if (m.slides && m.slides.length > 0) {
+          const isPdf = m.name.toLowerCase().includes('pdf') || (typeof m.value === 'string' && m.value.toLowerCase().includes('.pdf'))
+          if (!this.presentations.some((p) => p.title.toLowerCase() === m.name.toLowerCase())) {
+            this.presentations.push({
+              id: m.id,
+              title: m.name,
+              subtitle: `${m.slides.length} diapositivas / páginas`,
+              kind: isPdf ? 'pdf' : 'pptx',
+              slides: m.slides
+            })
+          }
+        }
+        mediaCleaned = true
+        return false // Excluir permanentemente de Medios
+      }
+      return true
+    })
+    if (mediaCleaned) {
+      this.saveToDisk()
+    }
 
     // Migrar medios antiguos con data: URLs pesadas a archivos reales en mediaDir
     if (this.mediaDir && existsSync(this.mediaDir)) {
@@ -340,11 +384,37 @@ export class WorkspaceStore {
     return this.mediaDir
   }
 
+  private isDocument(item: { name?: string; value?: string; category?: string; slides?: unknown[] }): boolean {
+    if (!item) return false
+    if ((item.slides && item.slides.length > 0) || item.slides !== undefined) return true
+    const n = (item.name || '').toLowerCase()
+    if (/\.(pdf|pptx|ppt|ppsx|pps|potx)($|[?#])/i.test(n) || /^(pdf|powerpoint):/i.test(n)) return true
+    const v = typeof item.value === 'string' ? item.value.toLowerCase() : ''
+    if (/\.(pdf|pptx|ppt|ppsx|pps|potx)($|[?#])/i.test(v)) return true
+    if (item.category && ['diapositivas', 'presentaciones', 'documentos', 'pdf'].includes(item.category.toLowerCase())) return true
+    return false
+  }
+
   listMedia(): MediaBackground[] {
-    return structuredClone(this.media)
+    // Nunca devolver PDFs, PPTXs ni medios con diapositivas — esos van estrictamente en listPresentations()
+    return structuredClone(this.media.filter((m) => !this.isDocument(m)))
   }
 
   addMedia(input: MediaBackgroundInput): MediaBackground[] {
+    // Bloqueo total: Si es PDF, PPTX o diapositivas, JAMÁS entra en Medios
+    if (this.isDocument(input)) {
+      if (input.slides && input.slides.length > 0) {
+        this.savePresentation({
+          id: `deck-${Date.now()}`,
+          title: input.name,
+          subtitle: `${input.slides.length} diapositivas`,
+          kind: (input.name || '').toLowerCase().includes('pdf') ? 'pdf' : 'pptx',
+          slides: input.slides
+        })
+      }
+      return this.listMedia()
+    }
+
     let finalValue = input.value
     const destDir = input.category === 'Fondo' ? this.backgroundsDir : this.mediaDir
     if (destDir) {
@@ -424,30 +494,89 @@ export class WorkspaceStore {
     if (!this.backgroundsDir || !existsSync(this.backgroundsDir)) return this.listMedia()
     try {
       const files = readdirSync(this.backgroundsDir)
+      let changed = false
+
+      // 1. Eliminar de la lista fondos en backgroundsDir o fondos/ que hayan sido borrados en disco
+      this.media = this.media.filter((m) => {
+        if (m.category === 'Fondo' && typeof m.value === 'string' && m.value.startsWith('lumen-media://local/')) {
+          try {
+            const u = new URL(m.value)
+            let p = decodeURIComponent(u.pathname)
+            if (/^\/[a-zA-Z]:/.test(p)) p = p.slice(1)
+            p = p.replace(/\//g, '\\')
+            const isFondoPath = p.toLowerCase().includes('fondos') || p.toLowerCase().includes('backgrounds')
+            if (isFondoPath && !existsSync(p) && !existsSync(`${p}.mp4`) && !existsSync(`${p}.png`)) {
+              changed = true
+              return false
+            }
+          } catch {
+            // ignore
+          }
+        }
+        return true
+      })
+
+      // 2. Incorporar archivos nuevos detectados en la carpeta de fondos
       const existingNames = new Set(this.media.map((m) => m.name.toLowerCase()))
-      let added = false
+      const existingPaths = new Set(
+        this.media
+          .filter((m) => typeof m.value === 'string' && m.value.startsWith('lumen-media://local/'))
+          .map((m) => {
+            try {
+              const u = new URL(m.value)
+              let p = decodeURIComponent(u.pathname)
+              if (/^\/[a-zA-Z]:/.test(p)) p = p.slice(1)
+              return p.replace(/\//g, '\\').toLowerCase()
+            } catch {
+              return ''
+            }
+          })
+          .filter(Boolean)
+      )
+
       for (const file of files) {
-        const ext = file.split('.').pop()?.toLowerCase() ?? ''
-        const isVideo = ['mp4', 'webm', 'mov', 'mkv', 'avi'].includes(ext)
-        const isImage = ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext)
+        let filePath = join(this.backgroundsDir, file)
+        let rawExt = extname(file).replace(/^\./, '').toLowerCase()
+
+        if (!rawExt && existsSync(filePath)) {
+          try {
+            const buf = Buffer.alloc(16)
+            const fd = openSync(filePath, 'r')
+            readSync(fd, buf, 0, 16, 0)
+            closeSync(fd)
+            const isFtyp = buf.includes(Buffer.from('ftyp'))
+            const targetExt = isFtyp ? '.mp4' : '.png'
+            const newPath = `${filePath}${targetExt}`
+            if (!existsSync(newPath)) {
+              copyFileSync(filePath, newPath)
+            }
+            filePath = newPath
+            rawExt = targetExt.replace(/^\./, '')
+          } catch {
+            // ignore
+          }
+        }
+
+        const isVideo = ['mp4', 'webm', 'mov', 'mkv', 'avi', 'm4v'].includes(rawExt)
+        const isImage = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'].includes(rawExt)
         if (!isVideo && !isImage) continue
-        const baseName = file.replace(/\.[^/.]+$/, '')
-        if (!existingNames.has(baseName.toLowerCase())) {
-          const targetPath = join(this.backgroundsDir, file)
+        const baseName = basename(filePath, extname(filePath))
+        if (!existingNames.has(baseName.toLowerCase()) && !existingPaths.has(filePath.toLowerCase())) {
           const newBg: MediaBackground = {
             id: `bg-fondo-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             name: baseName,
             kind: isVideo ? 'video' : 'image',
-            value: `lumen-media://local/${encodeURIComponent(targetPath.replace(/\\/g, '/'))}`,
-            accentColor: isVideo ? '#38bdf8' : '#f59e0b',
+            value: `lumen-media://local/${encodeURIComponent(filePath.replace(/\\/g, '/'))}`,
+            accentColor: isVideo ? '#38bdf8' : '#6366f1',
             category: 'Fondo'
           }
           this.media.unshift(newBg)
           existingNames.add(baseName.toLowerCase())
-          added = true
+          existingPaths.add(filePath.toLowerCase())
+          changed = true
         }
       }
-      if (added) this.saveToDisk()
+      if (changed) this.saveToDisk()
     } catch (e) {
       console.warn('[workspace] Error al recargar fondos:', e)
     }
@@ -458,30 +587,101 @@ export class WorkspaceStore {
     if (!this.mediaDir || !existsSync(this.mediaDir)) return this.listMedia()
     try {
       const files = readdirSync(this.mediaDir)
+      let changed = false
+
+      // 1. Eliminar medios de culto que hayan sido borrados manualmente de la carpeta
+      this.media = this.media.filter((m) => {
+        if (m.category === 'Culto' && typeof m.value === 'string' && m.value.startsWith('lumen-media://local/')) {
+          try {
+            const u = new URL(m.value)
+            let p = decodeURIComponent(u.pathname)
+            if (/^\/[a-zA-Z]:/.test(p)) p = p.slice(1)
+            p = p.replace(/\//g, '\\')
+            if (p.toLowerCase().includes('media') && !existsSync(p) && !existsSync(`${p}.mp4`) && !existsSync(`${p}.png`)) {
+              changed = true
+              return false
+            }
+          } catch {
+            // ignore
+          }
+        }
+        return true
+      })
+
+      // 2. Reparar y añadir archivos nuevos en la carpeta media/
       const existingNames = new Set(this.media.map((m) => m.name.toLowerCase()))
-      let added = false
+      const existingPaths = new Set(
+        this.media
+          .filter((m) => typeof m.value === 'string' && m.value.startsWith('lumen-media://local/'))
+          .map((m) => {
+            try {
+              const u = new URL(m.value)
+              let p = decodeURIComponent(u.pathname)
+              if (/^\/[a-zA-Z]:/.test(p)) p = p.slice(1)
+              return p.replace(/\//g, '\\').toLowerCase()
+            } catch {
+              return ''
+            }
+          })
+          .filter(Boolean)
+      )
+
       for (const file of files) {
-        const ext = file.split('.').pop()?.toLowerCase() ?? ''
-        const isVideo = ['mp4', 'webm', 'mov', 'mkv', 'avi'].includes(ext)
-        const isImage = ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext)
+        // Bloqueo total: Ignorar radicalmente cualquier PDF o PowerPoint en media/
+        if (/\.(pdf|pptx|ppt|ppsx|pps|potx)($|[?#])/i.test(file)) continue
+
+        let filePath = join(this.mediaDir, file)
+        let rawExt = extname(file).replace(/^\./, '').toLowerCase()
+
+        // Si no tiene extensión, verificar si es video mp4 o imagen real (NUNCA pdf ni pptx)
+        if (!rawExt && existsSync(filePath)) {
+          try {
+            const buf = Buffer.alloc(16)
+            const fd = openSync(filePath, 'r')
+            readSync(fd, buf, 0, 16, 0)
+            closeSync(fd)
+            // Si es documento PDF (%PDF) o ZIP/PPTX (PK), ignorar de inmediato
+            if (buf.includes(Buffer.from('%PDF')) || (buf[0] === 0x50 && buf[1] === 0x4B)) {
+              continue
+            }
+            const isFtyp = buf.includes(Buffer.from('ftyp'))
+            const isPng = buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47
+            const isJpg = buf[0] === 0xFF && buf[1] === 0xD8
+            if (!isFtyp && !isPng && !isJpg) {
+              continue
+            }
+            const targetExt = isFtyp ? '.mp4' : isPng ? '.png' : '.jpg'
+            const newPath = `${filePath}${targetExt}`
+            if (!existsSync(newPath)) {
+              copyFileSync(filePath, newPath)
+            }
+            filePath = newPath
+            rawExt = targetExt.replace(/^\./, '')
+          } catch {
+            continue
+          }
+        }
+
+        const isVideo = ['mp4', 'webm', 'mov', 'mkv', 'avi', 'm4v'].includes(rawExt)
+        const isImage = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'].includes(rawExt)
         if (!isVideo && !isImage) continue
-        const baseName = file.replace(/\.[^/.]+$/, '')
-        if (!existingNames.has(baseName.toLowerCase())) {
-          const targetPath = join(this.mediaDir, file)
+        const baseName = basename(filePath, extname(filePath))
+        if (!existingNames.has(baseName.toLowerCase()) && !existingPaths.has(filePath.toLowerCase())) {
           const newBg: MediaBackground = {
             id: `bg-disk-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             name: baseName,
             kind: isVideo ? 'video' : 'image',
-            value: `lumen-media://local/${encodeURIComponent(targetPath.replace(/\\/g, '/'))}`,
+            value: `lumen-media://local/${encodeURIComponent(filePath.replace(/\\/g, '/'))}`,
             accentColor: isVideo ? '#38bdf8' : '#f59e0b',
             category: 'Culto'
           }
           this.media.unshift(newBg)
           existingNames.add(baseName.toLowerCase())
-          added = true
+          existingPaths.add(filePath.toLowerCase())
+          changed = true
         }
       }
-      if (added) this.saveToDisk()
+      if (changed) this.saveToDisk()
     } catch (e) {
       console.warn('[workspace] Error al recargar medios:', e)
     }
@@ -493,6 +693,59 @@ export class WorkspaceStore {
     this.media = this.media.filter((m) => m.id !== id)
     this.saveToDisk()
     return this.listMedia()
+  }
+
+  // --- Diapositivas y presentaciones (PDF / PowerPoint) ---
+
+  getSlidesDirectory(): string {
+    return this.slidesDir
+  }
+
+  async openSlidesFolder(): Promise<string> {
+    try {
+      if (!existsSync(this.slidesDir)) {
+        mkdirSync(this.slidesDir, { recursive: true })
+      }
+      const { shell } = await import('electron')
+      await shell.openPath(this.slidesDir)
+    } catch {
+      // Ignorar fallo fuera de Electron
+    }
+    return this.slidesDir
+  }
+
+  listPresentations(): PresentationDeck[] {
+    return structuredClone(this.presentations)
+  }
+
+  savePresentation(deck: PresentationDeck): PresentationDeck[] {
+    const existingIdx = this.presentations.findIndex(
+      (p) => p.id === deck.id || p.title.toLowerCase() === deck.title.toLowerCase()
+    )
+    if (existingIdx !== -1) {
+      this.presentations[existingIdx] = deck
+    } else {
+      this.presentations.unshift(deck)
+    }
+    this.saveToDisk()
+    return this.listPresentations()
+  }
+
+  deletePresentation(id: string): PresentationDeck[] {
+    const lower = id.toLowerCase()
+    this.presentations = this.presentations.filter(
+      (p) => p.id !== id && p.title.toLowerCase() !== lower
+    )
+    this.saveToDisk()
+    return this.listPresentations()
+  }
+
+  reloadSlides(): PresentationDeck[] {
+    const loaded = this.loadFromDisk()
+    if (loaded && Array.isArray(loaded.presentations)) {
+      this.presentations = loaded.presentations
+    }
+    return this.listPresentations()
   }
 
   // --- Asistente inteligente local (sin conexión externa) ---
@@ -574,7 +827,8 @@ export class WorkspaceStore {
         songs: this.songs,
         schedule: this.schedule,
         media: this.media,
-        settings: this.settings
+        settings: this.settings,
+        presentations: this.presentations
       }
       writeFileSync(this.filePath, JSON.stringify(payload, null, 2), 'utf-8')
     } catch (error) {

@@ -8,6 +8,7 @@ import type {
   LiveProjectionState,
   MediaBackground,
   MediaBackgroundInput,
+  PresentationDeck,
   PresentationSlide,
   ProjectionDisplayMode,
   ProjectionTheme,
@@ -76,6 +77,13 @@ export const IpcChannels = {
   mediaReload: 'media:reload',
   backgroundsOpenFolder: 'backgrounds:open-folder',
   backgroundsReload: 'backgrounds:reload',
+
+  /** Diapositivas y presentaciones (PDF / PowerPoint) */
+  slidesList: 'slides:list',
+  slidesSave: 'slides:save',
+  slidesDelete: 'slides:delete',
+  slidesOpenFolder: 'slides:open-folder',
+  slidesReload: 'slides:reload',
 
   /** Enlaces externos (WhatsApp, mailto) */
   appOpenExternal: 'app:open-external',
@@ -201,6 +209,7 @@ export type {
   LiveProjectionState,
   MediaBackground,
   MediaBackgroundInput,
+  PresentationDeck,
   PresentationSlide,
   ProjectionDisplayMode,
   ProjectionTheme,

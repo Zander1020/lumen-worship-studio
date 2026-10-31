@@ -3,6 +3,7 @@ import type { BackgroundKind, MediaBackground } from '../../../../shared/ipc'
 import { isVideoUrl } from '../../../../shared/slideHelpers'
 import { MotionVideoBackground } from '../../components/SlidePreviewStage'
 import type { UseAppStatus } from '../../hooks/useAppStatus'
+import { ConfirmDeleteModal } from '../../components/ConfirmDeleteModal'
 
 export interface MediaPageProps {
   app: UseAppStatus
@@ -15,6 +16,19 @@ export function MediaPage({ app }: MediaPageProps) {
   const [activeTab, setActiveTab] = useState<'images' | 'backgrounds'>('images')
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('Todas')
   const [searchQuery, setSearchQuery] = useState('')
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean
+    title: string
+    itemName: string
+    itemType: string
+    onConfirm: () => void
+  }>({
+    isOpen: false,
+    title: '',
+    itemName: '',
+    itemType: '',
+    onConfirm: () => {}
+  })
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Estados para añadir fondo personalizado
@@ -27,9 +41,19 @@ export function MediaPage({ app }: MediaPageProps) {
   const currentTheme = app.status?.projection.live.theme
   const live = app.status?.projection.live
 
-  // Filtrar imágenes del culto
+  const isDoc = (m: MediaBackground): boolean => {
+    if ((m.slides && m.slides.length > 0) || (m as { slides?: unknown[] }).slides !== undefined) return true
+    const lowerName = (m.name || '').toLowerCase()
+    if (/\.(pdf|pptx|ppt|ppsx|pps|potx)($|[?#])/i.test(lowerName) || /^(pdf|powerpoint):/i.test(lowerName)) return true
+    const lowerVal = typeof m.value === 'string' ? m.value.toLowerCase() : ''
+    if (/\.(pdf|pptx|ppt|ppsx|pps|potx)($|[?#])/i.test(lowerVal)) return true
+    if (m.category && ['diapositivas', 'presentaciones', 'documentos', 'pdf'].includes(m.category.toLowerCase())) return true
+    return false
+  }
+
+  // Filtrar estrictamente solo imágenes reales del culto (sin diapositivas de presentaciones)
   const churchImages = useMemo(() => {
-    return app.media.filter((m) => m.kind === 'image')
+    return app.media.filter((m) => m.kind === 'image' && !isDoc(m))
   }, [app.media])
 
   const filteredImages = useMemo(() => {
@@ -41,9 +65,9 @@ export function MediaPage({ app }: MediaPageProps) {
     })
   }, [churchImages, categoryFilter, searchQuery])
 
-  // Fondos (degradados, sólidos y videos de fondo)
+  // Fondos (degradados, sólidos y videos de fondo — sin ningún documento)
   const backgroundItems = useMemo(() => {
-    return app.media.filter((m) => m.kind !== 'image')
+    return app.media.filter((m) => m.kind !== 'image' && !isDoc(m))
   }, [app.media])
 
   const applyBackground = (bg: MediaBackground): void => {
@@ -101,6 +125,14 @@ export function MediaPage({ app }: MediaPageProps) {
 
   const handleUploadFiles = (files: FileList | File[]): void => {
     Array.from(files).forEach((file) => {
+      // Bloqueo total: Si es PDF o PowerPoint, jamás se añade a Medios (solo van a Diapositivas)
+      if (
+        /\.(pdf|pptx|ppt|ppsx|pps|potx)$/i.test(file.name) ||
+        file.type.includes('pdf') ||
+        file.type.includes('presentation')
+      ) {
+        return
+      }
       const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mkv|mov|avi|ogv|m4v)$/i.test(file.name)
       const nativePath =
         (file as unknown as { path?: string }).path ||
@@ -215,7 +247,7 @@ export function MediaPage({ app }: MediaPageProps) {
             className="hly-mini-btn hly-mini-btn--primary"
             onClick={() => fileInputRef.current?.click()}
           >
-            + Subir imágenes / vídeos
+            + Importar
           </button>
         </div>
       </header>
@@ -403,7 +435,18 @@ export function MediaPage({ app }: MediaPageProps) {
                           type="button"
                           className="hly-mini-btn hly-mini-btn--danger"
                           title="Eliminar imagen"
-                          onClick={() => void app.deleteMedia(img.id)}
+                          onClick={() => {
+                            setDeleteConfirm({
+                              isOpen: true,
+                              title: '¿Eliminar imagen?',
+                              itemName: img.name,
+                              itemType: 'imagen del culto',
+                              onConfirm: () => {
+                                void app.deleteMedia(img.id)
+                                setDeleteConfirm((prev) => ({ ...prev, isOpen: false }))
+                              }
+                            })
+                          }}
                         >
                           🗑
                         </button>
@@ -497,7 +540,18 @@ export function MediaPage({ app }: MediaPageProps) {
                             type="button"
                             className="button button--danger"
                             aria-label={`Eliminar ${bg.name}`}
-                            onClick={() => void app.deleteMedia(bg.id)}
+                            onClick={() => {
+                              setDeleteConfirm({
+                                isOpen: true,
+                                title: '¿Eliminar fondo de proyección?',
+                                itemName: bg.name,
+                                itemType: 'fondo multimedia',
+                                onConfirm: () => {
+                                  void app.deleteMedia(bg.id)
+                                  setDeleteConfirm((prev) => ({ ...prev, isOpen: false }))
+                                }
+                              })
+                            }}
                           >
                             Eliminar
                           </button>
@@ -586,6 +640,15 @@ export function MediaPage({ app }: MediaPageProps) {
           </div>
         </div>
       )}
+      {/* Modal elegante de confirmación de eliminación */}
+      <ConfirmDeleteModal
+        isOpen={deleteConfirm.isOpen}
+        title={deleteConfirm.title}
+        itemName={deleteConfirm.itemName}
+        itemType={deleteConfirm.itemType}
+        onConfirm={deleteConfirm.onConfirm}
+        onCancel={() => setDeleteConfirm((prev) => ({ ...prev, isOpen: false }))}
+      />
     </section>
   )
 }

@@ -1,4 +1,5 @@
 import { type ChangeEvent, type WheelEvent, useEffect, useMemo, useRef, useState } from 'react'
+import type { MediaBackground } from '../../../../shared/ipc'
 import { ProjectionControls } from '../../features/projection/ProjectionControls'
 import type { UseAppStatus } from '../../hooks/useAppStatus'
 import { describeProjection } from '../../lib/statusLabels'
@@ -40,11 +41,22 @@ export function LiveDock({ app }: LiveDockProps) {
 
   const [dualMonitor, setDualMonitor] = useState(false)
   const [lowerTab, setLowerTab] = useState<LiveLowerTab>('backgrounds')
+  const [isReloading, setIsReloading] = useState(false)
   const fondosFileInputRef = useRef<HTMLInputElement | null>(null)
 
-  // Filtrar estrictamente solo fondos y loops del sistema o subidos como fondo (excluir medios del culto)
+  // Filtrar estrictamente solo fondos y loops del sistema (excluir medios del culto y cualquier documento de diapositivas)
+  const isDoc = (m: MediaBackground): boolean => {
+    if ((m.slides && m.slides.length > 0) || (m as { slides?: unknown[] }).slides !== undefined) return true
+    const lowerName = (m.name || '').toLowerCase()
+    if (/\.(pdf|pptx|ppt|ppsx|pps|potx)($|[?#])/i.test(lowerName) || /^(pdf|powerpoint):/i.test(lowerName)) return true
+    const lowerVal = typeof m.value === 'string' ? m.value.toLowerCase() : ''
+    if (/\.(pdf|pptx|ppt|ppsx|pps|potx)($|[?#])/i.test(lowerVal)) return true
+    if (m.category && ['diapositivas', 'presentaciones', 'documentos', 'pdf'].includes(m.category.toLowerCase())) return true
+    return false
+  }
+
   const fondosMedia = useMemo(() => {
-    return app.media.filter((m) => m.category !== 'Culto')
+    return app.media.filter((m) => m.category !== 'Culto' && !isDoc(m))
   }, [app.media])
 
   const handleUploadFondoFiles = (e: ChangeEvent<HTMLInputElement>): void => {
@@ -584,9 +596,13 @@ export function LiveDock({ app }: LiveDockProps) {
                 type="button"
                 className="hly-mini-btn"
                 title="Recargar fondos locales desde el disco"
-                onClick={() => void app.reloadBackgrounds?.()}
+                onClick={async () => {
+                  setIsReloading(true)
+                  await app.reloadBackgrounds?.()
+                  setTimeout(() => setIsReloading(false), 500)
+                }}
               >
-                🔄
+                <span style={{ display: 'inline-block', transform: isReloading ? 'rotate(360deg)' : 'none', transition: 'transform 0.5s ease' }}>🔄</span>
               </button>
               <button
                 type="button"

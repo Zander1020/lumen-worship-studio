@@ -9,6 +9,7 @@ import type {
   HolyricsImportItem,
   MediaBackground,
   MediaBackgroundInput,
+  PresentationDeck,
   ProjectionGoToSlideRequest,
   ProjectionLoadDeckRequest,
   ProjectionOpenRequest,
@@ -67,6 +68,13 @@ export interface LumenApi {
   readonly openBackgroundsFolder?: () => Promise<string>
   readonly reloadBackgrounds?: () => Promise<MediaBackground[]>
   readonly getPathForFile?: (file: File) => string
+
+  /** Diapositivas y presentaciones (PDF / PowerPoint) */
+  readonly listPresentations?: () => Promise<PresentationDeck[]>
+  readonly savePresentation?: (deck: PresentationDeck) => Promise<PresentationDeck[]>
+  readonly deletePresentation?: (id: string) => Promise<PresentationDeck[]>
+  readonly openSlidesFolder?: () => Promise<string>
+  readonly reloadSlides?: () => Promise<PresentationDeck[]>
 
   /** Control remoto móvil en red local */
   readonly getRemoteInfo: () => Promise<RemoteServerInfo>

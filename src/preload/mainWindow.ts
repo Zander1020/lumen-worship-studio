@@ -18,6 +18,7 @@ import {
   type HolyricsImportItem,
   type MediaBackground,
   type MediaBackgroundInput,
+  type PresentationDeck,
   type ProjectionGoToSlideRequest,
   type ProjectionLoadDeckRequest,
   type ProjectionOpenRequest,
@@ -85,6 +86,13 @@ const api: LumenApi = {
   reloadMedia: () => ipcRenderer.invoke(IpcChannels.mediaReload) as Promise<MediaBackground[]>,
   openBackgroundsFolder: () => ipcRenderer.invoke(IpcChannels.backgroundsOpenFolder) as Promise<string>,
   reloadBackgrounds: () => ipcRenderer.invoke(IpcChannels.backgroundsReload) as Promise<MediaBackground[]>,
+  listPresentations: () => ipcRenderer.invoke(IpcChannels.slidesList) as Promise<PresentationDeck[]>,
+  savePresentation: (deck: PresentationDeck) =>
+    ipcRenderer.invoke(IpcChannels.slidesSave, deck) as Promise<PresentationDeck[]>,
+  deletePresentation: (id: string) =>
+    ipcRenderer.invoke(IpcChannels.slidesDelete, { id }) as Promise<PresentationDeck[]>,
+  openSlidesFolder: () => ipcRenderer.invoke(IpcChannels.slidesOpenFolder) as Promise<string>,
+  reloadSlides: () => ipcRenderer.invoke(IpcChannels.slidesReload) as Promise<PresentationDeck[]>,
   openExternalUrl: (url: string) => ipcRenderer.invoke(IpcChannels.appOpenExternal, url) as Promise<boolean>,
   getPathForFile: (file: File) => {
     try {

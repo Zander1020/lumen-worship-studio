@@ -81,6 +81,16 @@ export interface MediaBackground {
   slides?: PresentationSlide[]
 }
 
+export interface PresentationDeck {
+  id: string
+  title: string
+  subtitle: string
+  kind: 'pdf' | 'pptx'
+  filePath?: string
+  slides: PresentationSlide[]
+  createdAt?: number
+}
+
 export interface MediaBackgroundInput {
   name: string
   kind: BackgroundKind

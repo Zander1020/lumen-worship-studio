@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createAnnouncementSlide } from '../../../../shared/slideHelpers'
 import type { UseAppStatus } from '../../hooks/useAppStatus'
+import { ConfirmDeleteModal } from '../../components/ConfirmDeleteModal'
 
 export interface SchedulePageProps {
   app: UseAppStatus
@@ -10,6 +11,19 @@ export function SchedulePage({ app }: SchedulePageProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [annTitle, setAnnTitle] = useState('')
   const [annBody, setAnnBody] = useState('')
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean
+    title: string
+    itemName: string
+    itemType: string
+    onConfirm: () => void
+  }>({
+    isOpen: false,
+    title: '',
+    itemName: '',
+    itemType: '',
+    onConfirm: () => {}
+  })
 
   const activeItem = app.schedule.find((i) => i.id === selectedId) ?? app.schedule[0]
 
@@ -40,7 +54,19 @@ export function SchedulePage({ app }: SchedulePageProps) {
             <button
               type="button"
               className="button button--danger"
-              onClick={() => void app.clearSchedule()}
+              onClick={() => {
+                setDeleteConfirm({
+                  isOpen: true,
+                  title: '¿Vaciar todo el orden del culto?',
+                  itemName: `Todos los elementos (${app.schedule.length})`,
+                  itemType: 'programación completa',
+                  onConfirm: () => {
+                    void app.clearSchedule()
+                    setSelectedId(null)
+                    setDeleteConfirm((prev) => ({ ...prev, isOpen: false }))
+                  }
+                })
+              }}
             >
               Vaciar programación
             </button>
@@ -110,7 +136,19 @@ export function SchedulePage({ app }: SchedulePageProps) {
                         type="button"
                         className="button button--danger"
                         aria-label={`Quitar ${item.title}`}
-                        onClick={() => void app.removeScheduleItem(item.id)}
+                        onClick={() => {
+                          setDeleteConfirm({
+                            isOpen: true,
+                            title: '¿Quitar del orden del culto?',
+                            itemName: item.title,
+                            itemType: 'elemento programado',
+                            onConfirm: () => {
+                              void app.removeScheduleItem(item.id)
+                              if (selectedId === item.id) setSelectedId(null)
+                              setDeleteConfirm((prev) => ({ ...prev, isOpen: false }))
+                            }
+                          })
+                        }}
                       >
                         ✕
                       </button>
@@ -187,6 +225,15 @@ export function SchedulePage({ app }: SchedulePageProps) {
           )}
         </div>
       </div>
+      {/* Modal elegante de confirmación de eliminación */}
+      <ConfirmDeleteModal
+        isOpen={deleteConfirm.isOpen}
+        title={deleteConfirm.title}
+        itemName={deleteConfirm.itemName}
+        itemType={deleteConfirm.itemType}
+        onConfirm={deleteConfirm.onConfirm}
+        onCancel={() => setDeleteConfirm((prev) => ({ ...prev, isOpen: false }))}
+      />
     </section>
   )
 }

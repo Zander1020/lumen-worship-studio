@@ -60,10 +60,15 @@ export function initAutoUpdater(getMainWindow: () => BrowserWindow | null): void
   })
 
   autoUpdater.on('error', (err) => {
-    broadcast({
-      status: 'error',
-      error: err ? err.message : 'Error desconocido al comprobar actualizaciones'
-    })
+    const msg = err ? err.message : ''
+    console.warn('[AutoUpdater] Error:', msg)
+    // No molestar con popups si el release aún no está publicado o retorna 404 (ej. latest.yml inexistente)
+    if (!msg.includes('404') && !msg.includes('latest.yml')) {
+      broadcast({
+        status: 'error',
+        error: msg || 'Error desconocido al comprobar actualizaciones'
+      })
+    }
   })
 
   // IPC Handlers

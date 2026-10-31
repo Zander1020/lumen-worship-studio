@@ -245,6 +245,30 @@ export function registerIpcHandlers(ctx: IpcContext): () => void {
     return ctx.workspace.reloadBackgrounds()
   })
 
+  handle(IpcChannels.slidesList, onlyMain, (payload) => {
+    assertNoPayload(payload)
+    return ctx.workspace.listPresentations()
+  })
+
+  handle(IpcChannels.slidesSave, onlyMain, (payload) => {
+    return ctx.workspace.savePresentation(payload as unknown as import('../../shared/models').PresentationDeck)
+  })
+
+  handle(IpcChannels.slidesDelete, onlyMain, (payload) => {
+    const id = parseRawString(payload, 'id', 200)
+    return ctx.workspace.deletePresentation(id)
+  })
+
+  handle(IpcChannels.slidesOpenFolder, onlyMain, async (payload) => {
+    assertNoPayload(payload)
+    return await ctx.workspace.openSlidesFolder()
+  })
+
+  handle(IpcChannels.slidesReload, onlyMain, (payload) => {
+    assertNoPayload(payload)
+    return ctx.workspace.reloadSlides()
+  })
+
   handle(IpcChannels.appOpenExternal, onlyMain, async (payload) => {
     const url = parseRawString(payload, 'url', 1000)
     if (url.startsWith('https://wa.me/') || url.startsWith('mailto:') || url.startsWith('https://api.whatsapp.com/')) {

@@ -81,6 +81,11 @@ describe('App (ventana principal)', () => {
       deleteMedia: vi.fn().mockResolvedValue([...DEFAULT_MEDIA_BACKGROUNDS]),
       openMediaFolder: vi.fn().mockResolvedValue('C:\\test\\media'),
       reloadMedia: vi.fn().mockResolvedValue([...DEFAULT_MEDIA_BACKGROUNDS]),
+      listPresentations: vi.fn().mockResolvedValue([]),
+      savePresentation: vi.fn().mockResolvedValue([]),
+      deletePresentation: vi.fn().mockResolvedValue([]),
+      openSlidesFolder: vi.fn().mockResolvedValue('C:\\test\\diapositivas'),
+      reloadSlides: vi.fn().mockResolvedValue([]),
       getRemoteInfo: vi.fn().mockResolvedValue({
         running: false,
         port: 4319,

@@ -24,12 +24,11 @@ export function UpdateNotifierModal(): React.JSX.Element | null {
 
     // Escuchar eventos
     const unsubscribe = window.lumen.onUpdateStatusChanged((state: UpdateInfoState) => {
-      if (state.status === 'available' || state.status === 'downloading' || state.status === 'downloaded' || state.status === 'error') {
+      if (state.status === 'available' || state.status === 'downloading' || state.status === 'downloaded') {
         setUpdateState(state)
         setDismissed(false)
-      } else if (state.status === 'not-available') {
-        // No hay actualizaciones
       }
+      // Los errores de red/404 se silencian: no mostrar popup de error al usuario
     })
 
     return () => unsubscribe()
