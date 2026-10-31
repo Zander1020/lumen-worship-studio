@@ -10,6 +10,7 @@ import {
   songToSlides,
   transposeChordText
 } from '../../../../shared/slideHelpers'
+import { convertPdfToSlides, convertPptxToSlides } from './presentationDocHelpers'
 import type { UseAppStatus } from '../../hooks/useAppStatus'
 import { BiblePage } from '../bible/BiblePage'
 
@@ -43,7 +44,53 @@ export function HomePage({ app }: HomePageProps) {
 
   const handleUploadMediaFiles = (e: ChangeEvent<HTMLInputElement>): void => {
     const files = Array.from(e.target.files ?? [])
-    files.forEach((file) => {
+    files.forEach(async (file) => {
+      const lowerName = file.name.toLowerCase()
+      // Soporte nativo para presentaciones PDF y PowerPoint PPTX
+      if (lowerName.endsWith('.pdf')) {
+        try {
+          const deck = await convertPdfToSlides(file, file.name)
+          if (deck.slides.length > 0) {
+            void app.addScheduleItem({
+              kind: 'announcement',
+              title: `PDF: ${deck.title}`,
+              subtitle: `${deck.slides.length} páginas`,
+              slides: deck.slides
+            })
+            void app.loadProjectionDeck({
+              deckTitle: deck.title,
+              slides: deck.slides,
+              startIndex: 0,
+              openWindow: false
+            })
+            return
+          }
+        } catch (err) {
+          console.error('Error al procesar PDF:', err)
+        }
+      } else if (lowerName.endsWith('.pptx')) {
+        try {
+          const deck = await convertPptxToSlides(file, file.name)
+          if (deck.slides.length > 0) {
+            void app.addScheduleItem({
+              kind: 'announcement',
+              title: `PowerPoint: ${deck.title}`,
+              subtitle: `${deck.slides.length} diapositivas`,
+              slides: deck.slides
+            })
+            void app.loadProjectionDeck({
+              deckTitle: deck.title,
+              slides: deck.slides,
+              startIndex: 0,
+              openWindow: false
+            })
+            return
+          }
+        } catch (err) {
+          console.error('Error al procesar PPTX:', err)
+        }
+      }
+
       const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov|mkv|avi|ogv|m4v)$/i.test(file.name)
       const nativePath =
         (file as unknown as { path?: string }).path ||
@@ -451,7 +498,7 @@ export function HomePage({ app }: HomePageProps) {
                   <input
                     ref={homeMediaInputRef}
                     type="file"
-                    accept="image/*,video/*"
+                    accept="image/*,video/*,.pdf,.pptx"
                     multiple
                     style={{ display: 'none' }}
                     onChange={handleUploadMediaFiles}
@@ -475,10 +522,10 @@ export function HomePage({ app }: HomePageProps) {
                   <button
                     type="button"
                     className="hly-mini-btn"
-                    title="Añadir imágenes o vídeos desde el equipo"
+                    title="Añadir imágenes, vídeos o diapositivas (PDF / PowerPoint PPTX)"
                     onClick={() => homeMediaInputRef.current?.click()}
                   >
-                    ➕
+                    ➕ Importar / PPT / PDF
                   </button>
                 </div>
               </div>

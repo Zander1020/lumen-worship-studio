@@ -1,6 +1,7 @@
 import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
 import type { MediaBackground } from '../../../../shared/ipc'
 import { isVideoUrl } from '../../../../shared/slideHelpers'
+import { convertPdfToSlides, convertPptxToSlides } from '../../features/home/presentationDocHelpers'
 import type { UseAppStatus } from '../../hooks/useAppStatus'
 
 export interface HolyricsLeftDockProps {
@@ -42,7 +43,52 @@ export function HolyricsLeftDock({ app }: HolyricsLeftDockProps) {
   const handleUploadMediaFiles = (e: ChangeEvent<HTMLInputElement>): void => {
     const files = e.target.files
     if (!files || files.length === 0) return
-    Array.from(files).forEach((file) => {
+    Array.from(files).forEach(async (file) => {
+      const lowerName = file.name.toLowerCase()
+      if (lowerName.endsWith('.pdf')) {
+        try {
+          const deck = await convertPdfToSlides(file, file.name)
+          if (deck.slides.length > 0) {
+            void app.addScheduleItem({
+              kind: 'announcement',
+              title: `PDF: ${deck.title}`,
+              subtitle: `${deck.slides.length} páginas`,
+              slides: deck.slides
+            })
+            void app.loadProjectionDeck({
+              deckTitle: deck.title,
+              slides: deck.slides,
+              startIndex: 0,
+              openWindow: false
+            })
+            return
+          }
+        } catch (err) {
+          console.error('Error al importar PDF:', err)
+        }
+      } else if (lowerName.endsWith('.pptx')) {
+        try {
+          const deck = await convertPptxToSlides(file, file.name)
+          if (deck.slides.length > 0) {
+            void app.addScheduleItem({
+              kind: 'announcement',
+              title: `PowerPoint: ${deck.title}`,
+              subtitle: `${deck.slides.length} diapositivas`,
+              slides: deck.slides
+            })
+            void app.loadProjectionDeck({
+              deckTitle: deck.title,
+              slides: deck.slides,
+              startIndex: 0,
+              openWindow: false
+            })
+            return
+          }
+        } catch (err) {
+          console.error('Error al importar PPTX:', err)
+        }
+      }
+
       const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mkv|mov|avi|ogv|m4v)$/i.test(file.name)
       const nativePath =
         (file as unknown as { path?: string }).path ||
@@ -160,7 +206,7 @@ export function HolyricsLeftDock({ app }: HolyricsLeftDockProps) {
             <input
               ref={mediaFileInputRef}
               type="file"
-              accept="image/*,video/*"
+              accept="image/*,video/*,.pdf,.pptx"
               multiple
               style={{ display: 'none' }}
               onChange={handleUploadMediaFiles}

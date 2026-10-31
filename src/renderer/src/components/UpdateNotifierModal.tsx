@@ -134,9 +134,9 @@ export function UpdateNotifierModal(): React.JSX.Element | null {
       )}
 
       {updateState.status === 'error' && (
-        <p style={{ margin: '0 0 12px 0', fontSize: 12, color: '#ef4444' }}>
-          {updateState.error}
-        </p>
+        <div style={{ margin: '0 0 12px 0', fontSize: 12, color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', padding: 8, borderRadius: 6 }}>
+          <span>Hubo un detalle al conectar con la actualización automática. Puedes pulsar reintentar o actualizar manualmente.</span>
+        </div>
       )}
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
