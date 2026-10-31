@@ -1,5 +1,5 @@
 appId: com.lumenworship.studio
-productName: Lumen Worship Studio
+productName: Lumen Studio
 directories:
   buildResources: build
   output: release
@@ -36,7 +36,7 @@ nsis:
   allowElevation: true
   createDesktopShortcut: always
   createStartMenuShortcut: true
-  shortcutName: Lumen Worship Studio
-  uninstallDisplayName: Lumen Worship Studio
+  shortcutName: Lumen Studio
+  uninstallDisplayName: Lumen Studio
   runAfterFinish: true
 artifactName: ${productName}-Setup-${version}.${ext}

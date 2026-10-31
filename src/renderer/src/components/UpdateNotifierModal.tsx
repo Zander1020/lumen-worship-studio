@@ -100,7 +100,7 @@ export function UpdateNotifierModal(): React.JSX.Element | null {
 
       <p style={{ margin: '0 0 12px 0', fontSize: 13, color: '#d1d5db', lineHeight: 1.4 }}>
         {updateState.status === 'downloaded'
-          ? `Lumen Worship Studio v${updateState.version ?? ''} ya se descargó. Reinicia ahora para aplicar los cambios.`
+          ? `Lumen Studio v${updateState.version ?? ''} ya se descargó. Reinicia ahora para aplicar los cambios.`
           : updateState.status === 'downloading'
           ? `Descargando v${updateState.version ?? ''} en segundo plano...`
           : `Hay una nueva versión disponible (v${updateState.version ?? ''}). ¿Deseas descargarla e instalarla ahora?`}

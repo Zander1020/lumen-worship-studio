@@ -1,11 +1,11 @@
 {
   "name": "lumen-worship-studio",
-  "productName": "Lumen Worship Studio",
-  "version": "0.1.0",
+  "productName": "Lumen Studio",
+  "version": "0.1.1",
   "description": "Aplicación de escritorio para la proyección de alabanzas, Biblia y multimedia en servicios de adoración.",
   "private": true,
   "main": "./out/main/index.js",
-  "author": "Lumen Worship Studio",
+  "author": "Lumen Studio",
   "license": "UNLICENSED",
   "engines": {
     "node": ">=22.12.0"
