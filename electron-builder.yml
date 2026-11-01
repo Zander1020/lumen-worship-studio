@@ -1,56 +1,56 @@
 appId: com.lumenworship.studio
 productName: Lumen Studio
 directories:
-  buildResources: build
-  output: release
+ buildResources: build
+ output: release
 publish:
-  provider: github
-  owner: Zander1020
-  repo: lumen-worship-studio
+ provider: github
+ owner: Zander1020
+ repo: lumen-worship-studio
 files:
-  - '!**/.vscode/*'
-  - '!src/*'
-  - '!e2e/*'
-  - '!electron.vite.config.*'
-  - '!vitest.config.*'
-  - '!playwright.config.*'
-  - '!eslint.config.*'
-  - '!tsconfig*.json'
+ - '!**/.vscode/*'
+ - '!src/*'
+ - '!e2e/*'
+ - '!electron.vite.config.*'
+ - '!vitest.config.*'
+ - '!playwright.config.*'
+ - '!eslint.config.*'
+ - '!tsconfig*.json'
 extraResources:
-  - from: bd.mufl
-    to: bd.mufl
-  - from: out/main/es_rvr.json
-    to: es_rvr.json
-  - from: out/main/es_rvr1909.json
-    to: es_rvr1909.json
-  - from: out/main/es_nvi.json
-    to: es_nvi.json
-  - from: out/main/es_dhh.json
-    to: es_dhh.json
-  - from: out/main/es_lbla.json
-    to: es_lbla.json
-  - from: out/main/es_tla.json
-    to: es_tla.json
-  - from: out/main/es_ntv.json
-    to: es_ntv.json
-  - from: out/main/es_pdt.json
-    to: es_pdt.json
-  - from: lumen.png
-    to: lumen.png
+ - from: bd.mufl
+ to: bd.mufl
+ - from: out/main/es_rvr.json
+ to: es_rvr.json
+ - from: out/main/es_rvr1909.json
+ to: es_rvr1909.json
+ - from: out/main/es_nvi.json
+ to: es_nvi.json
+ - from: out/main/es_dhh.json
+ to: es_dhh.json
+ - from: out/main/es_lbla.json
+ to: es_lbla.json
+ - from: out/main/es_tla.json
+ to: es_tla.json
+ - from: out/main/es_ntv.json
+ to: es_ntv.json
+ - from: out/main/es_pdt.json
+ to: es_pdt.json
+ - from: lumen.png
+ to: lumen.png
 win:
-  icon: lumen.png
-  target:
-    - target: nsis
-      arch:
-        - x64
+ icon: lumen.png
+ target:
+ - target: nsis
+ arch:
+ - x64
 nsis:
-  oneClick: false
-  perMachine: false
-  allowToChangeInstallationDirectory: true
-  allowElevation: true
-  createDesktopShortcut: always
-  createStartMenuShortcut: true
-  shortcutName: Lumen Studio
-  uninstallDisplayName: Lumen Studio
-  runAfterFinish: true
+ oneClick: false
+ perMachine: false
+ allowToChangeInstallationDirectory: true
+ allowElevation: true
+ createDesktopShortcut: always
+ createStartMenuShortcut: true
+ shortcutName: Lumen Studio
+ uninstallDisplayName: Lumen Studio
+ runAfterFinish: true
 artifactName: ${productName}-Setup-${version}.${ext}
