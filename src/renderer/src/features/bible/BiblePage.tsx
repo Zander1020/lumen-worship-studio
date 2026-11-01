@@ -21,7 +21,9 @@ const BUILTIN_VERSION_OPTIONS: BibleVersionInfo[] = [
   { id: 'nvi', name: 'NVI', builtIn: true },
   { id: 'dhh', name: 'DHH', builtIn: true },
   { id: 'lbla', name: 'LBLA', builtIn: true },
-  { id: 'tla', name: 'TLA', builtIn: true }
+  { id: 'tla', name: 'TLA', builtIn: true },
+  { id: 'ntv', name: 'NTV', builtIn: true },
+  { id: 'pdt', name: 'PDT', builtIn: true }
 ]
 
 const BUILTIN_FULL_NAMES: Record<string, string> = {
@@ -30,7 +32,9 @@ const BUILTIN_FULL_NAMES: Record<string, string> = {
   nvi: 'Nueva Versión Internacional',
   dhh: 'Dios Habla Hoy',
   lbla: 'La Biblia de las Américas',
-  tla: 'Traducción en Lenguaje Actual'
+  tla: 'Traducción en Lenguaje Actual',
+  ntv: 'Nueva Traducción Viviente',
+  pdt: 'Palabra de Dios para Todos'
 }
 
 function getBookDivisionColor(bookName: string, testament?: 'AT' | 'NT'): string {
@@ -330,8 +334,14 @@ export function BiblePage({ app }: BiblePageProps) {
       ...(importAbbrev.trim() ? { abbrev: importAbbrev.trim() } : {}),
       ...(importFileName ? { fileName: importFileName } : {})
     })
-    if (res) closeImportModal()
-    else setImportAttempted(true)
+    if (res) {
+      const imported = res.find((v) => v.name === importName.trim()) ?? res.find((v) => v.id === importName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'))
+      closeImportModal()
+      if (imported) {
+        setBibleVersion(imported.id)
+        await app.loadBibleBooks(imported.id)
+      }
+    } else setImportAttempted(true)
   }
 
   const confirmDeleteVersion = async (): Promise<void> => {
@@ -371,11 +381,15 @@ export function BiblePage({ app }: BiblePageProps) {
             title="Seleccionar versión bíblica para la proyección"
           >
             <optgroup label="Clásicas">
-              {builtinVersions.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {BUILTIN_VERSION_OPTIONS.find((o) => o.id === v.id)?.name ?? v.name}
-                </option>
-              ))}
+              {builtinVersions.map((v) => {
+                const available = v.available !== false
+                return (
+                  <option key={v.id} value={v.id} disabled={!available}>
+                    {(BUILTIN_VERSION_OPTIONS.find((o) => o.id === v.id)?.name ?? v.name) +
+                      (available ? '' : ' (sin datos)')}
+                  </option>
+                )
+              })}
             </optgroup>
             {importedVersions.length > 0 && (
               <optgroup label="Mis versiones">
@@ -416,6 +430,40 @@ export function BiblePage({ app }: BiblePageProps) {
           />
         </div>
       </header>
+
+      {activeVersionInfo?.builtIn && activeVersionInfo.available === false && (
+        <div
+          style={{
+            margin: '6px 8px',
+            padding: '8px 10px',
+            borderRadius: 6,
+            background: 'rgba(234, 88, 12, 0.12)',
+            border: '1px solid rgba(234, 88, 12, 0.4)',
+            color: 'var(--text)',
+            fontSize: 12,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            flexWrap: 'wrap'
+          }}
+        >
+          <span>
+            La versión <strong>{activeVersionInfo.name}</strong> no incluye texto en esta instalación.
+            Importa su XML (formato Zefania/Holyrics) para activarla y convertirla en el texto real de esa versión.
+          </span>
+          <button
+            type="button"
+            className="hly-mini-btn hly-mini-btn--primary"
+            onClick={() => {
+              setImportName(activeVersionInfo.name)
+              setImportAbbrev(activeVersionInfo.id.toUpperCase())
+              setShowImportModal(true)
+            }}
+          >
+            Importar XML
+          </button>
+        </div>
+      )}
 
       {/* Disposición de 3 columnas a altura completa estilo Holyrics: [Libros] | [Capítulos + Versos] | [Versículos arriba] */}
       <div className="hly-bible-workbench">
@@ -678,10 +726,10 @@ export function BiblePage({ app }: BiblePageProps) {
             </label>
 
             <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#d1d5db', marginTop: 12 }}>
-              Archivo XML
+              Archivo (XML / XMM)
               <input
                 type="file"
-                accept=".xml,.txt,text/xml"
+                accept=".xml,.xmm,.bib,.txt,text/xml"
                 onChange={handleImportFile}
                 style={{
                   display: 'block',

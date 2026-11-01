@@ -32,7 +32,7 @@ export const SECTIONS: readonly SectionDefinition[] = [
   { id: 'design', label: 'Editor Gráfico', icon: '🎨', description: 'Creación visual de frases, predicadores y anuncios.', group: 'primary' },
   { id: 'projection', label: 'Proyección', icon: '▣', description: 'Ajustes avanzados de pantalla y calibración.', group: 'utility' },
   { id: 'remote', label: 'Control remoto', icon: '📱', description: 'Control móvil en red local LAN.', group: 'utility' },
-  { id: 'ai', label: 'Inteligencia artificial', icon: '✦', description: 'Sugeridor temático local de culto.', group: 'utility' },
+  { id: 'ai', label: 'Inteligencia artificial', icon: '✦', description: 'Chat gratuito con IA y sugeridor temático de culto.', group: 'utility' },
   { id: 'settings', label: 'Configuración', icon: '⚙', description: 'Preferencias generales del sistema.', group: 'utility' },
   { id: 'about', label: 'Acerca de', icon: 'ℹ', description: 'Información de la aplicación y su creador Alexander Yepez.', group: 'utility' }
 ] as const

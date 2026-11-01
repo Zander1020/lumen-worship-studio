@@ -123,6 +123,15 @@ const api: LumenApi = {
 
   suggestForTheme: (theme: string) =>
     ipcRenderer.invoke(IpcChannels.aiSuggestForTheme, theme) as Promise<AiSuggestionResult>,
+  chatWithAI: (messages: { role: string; content: string }[]) =>
+    ipcRenderer.invoke(IpcChannels.aiChat, messages) as Promise<string>,
+  chatWithAIStream: (request: { messages: { role: string; content: string }[]; requestId: string }) =>
+    ipcRenderer.invoke(IpcChannels.aiChatStream, request) as Promise<void>,
+  onAIChatChunk: (listener: (payload: { requestId: string; chunk: string; done: boolean; error?: string }) => void) => {
+    const wrapped = (_event: unknown, payload: { requestId: string; chunk: string; done: boolean; error?: string }) => listener(payload)
+    ipcRenderer.on(IpcChannels.aiChatChunk, wrapped)
+    return () => ipcRenderer.removeListener(IpcChannels.aiChatChunk, wrapped)
+  },
 
   getSettings: () => ipcRenderer.invoke(IpcChannels.settingsGet) as Promise<AppSettings>,
   updateSettings: (patch: Partial<AppSettings>) =>

@@ -90,6 +90,9 @@ export interface LumenApi {
 
   /** Asistente inteligente local */
   readonly suggestForTheme: (theme: string) => Promise<AiSuggestionResult>
+  readonly chatWithAI?: (messages: { role: string; content: string }[]) => Promise<string>
+  readonly chatWithAIStream?: (request: { messages: { role: string; content: string }[]; requestId: string }) => Promise<void>
+  readonly onAIChatChunk?: (listener: (payload: { requestId: string; chunk: string; done: boolean; error?: string }) => void) => () => void
 
   /** Control de ventana principal */
   readonly minimizeWindow?: () => Promise<boolean>
@@ -167,6 +170,9 @@ export const LUMEN_API_KEYS = [
   'stopRemoteServer',
   'regenerateRemotePin',
   'suggestForTheme',
+  'chatWithAI',
+  'chatWithAIStream',
+  'onAIChatChunk',
   'getSettings',
   'updateSettings'
 ] as const satisfies readonly (keyof LumenApi)[]

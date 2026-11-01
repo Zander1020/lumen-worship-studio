@@ -33,7 +33,7 @@ export function renderSection(id: SectionId, app: UseAppStatus): ReactNode {
     case 'remote':
       return <RemoteControlPage app={app} />
     case 'ai':
-      return <AiAssistantPage app={app} />
+      return <AiAssistantPage />
     case 'settings':
       return <SettingsPage app={app} />
     case 'about':

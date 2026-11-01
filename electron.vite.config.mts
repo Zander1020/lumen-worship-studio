@@ -15,11 +15,13 @@ export default defineConfig({
       {
         name: 'copy-bible-json',
         writeBundle() {
-          const src = resolve(root, 'src/main/data/es_rvr.json')
           const outDir = resolve(root, 'out/main')
-          if (existsSync(src)) {
-            mkdirSync(outDir, { recursive: true })
-            copyFileSync(src, resolve(outDir, 'es_rvr.json'))
+          mkdirSync(outDir, { recursive: true })
+          for (const file of ['es_rvr.json', 'es_rvr1909.json', 'es_nvi.json', 'es_dhh.json', 'es_lbla.json', 'es_tla.json', 'es_ntv.json', 'es_pdt.json']) {
+            const src = resolve(root, 'src/main/data', file)
+            if (existsSync(src)) {
+              copyFileSync(src, resolve(outDir, file))
+            }
           }
         }
       }

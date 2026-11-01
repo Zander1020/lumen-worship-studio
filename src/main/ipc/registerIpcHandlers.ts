@@ -332,6 +332,29 @@ export function registerIpcHandlers(ctx: IpcContext): () => void {
     return ctx.workspace.suggestForTheme(theme)
   })
 
+  handle(IpcChannels.aiChat, onlyMain, async (payload) => {
+    if (!Array.isArray(payload)) throw new ValidationError('Payload inválido.')
+    const messages = payload
+      .filter((m): m is { role: string; content: string } => !!m && typeof m === 'object' && typeof (m as { content?: unknown }).content === 'string' && typeof (m as { role?: unknown }).role === 'string')
+      .map((m) => ({ role: m.role, content: m.content.slice(0, 8000) }))
+      .filter((m) => ['user', 'assistant', 'system'].includes(m.role))
+    if (messages.length === 0) throw new ValidationError('Sin mensajes.')
+    try {
+      const res = await fetch('https://text.pollinations.ai/openai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages, model: 'openai' })
+      })
+      if (!res.ok) return `No se pudo obtener respuesta (HTTP ${res.status}). Intenta de nuevo.`
+      const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> }
+      const content = data.choices?.[0]?.message?.content
+      if (typeof content === 'string' && content.trim()) return content.trim()
+      return 'La IA no devolvió contenido. Intenta reformular la pregunta.'
+    } catch (err) {
+      return `Error de conexión: ${err instanceof Error ? err.message : String(err)}. Verifica tu conexión a internet.`
+    }
+  })
+
   // --- Configuración ---
 
   handle(IpcChannels.settingsGet, onlyMain, (payload) => {
@@ -389,6 +412,68 @@ export function registerIpcHandlers(ctx: IpcContext): () => void {
     const win = ctx.getMainWindow ? ctx.getMainWindow() : null
     return win && !win.isDestroyed() ? win.isMaximized() : false
   })
+
+  ipcMain.handle(IpcChannels.aiChatStream, async (event, ...args: unknown[]) => {
+    if (args.length > 1) throw new ValidationError('Demasiados argumentos.')
+    const payload = args[0]
+    if (!payload || typeof payload !== 'object') throw new ValidationError('Payload inválido.')
+    const obj = payload as { messages?: unknown; requestId?: unknown }
+    const requestId = typeof obj.requestId === 'string' ? obj.requestId : String(Date.now())
+    if (!Array.isArray(obj.messages)) throw new ValidationError('Payload inválido.')
+    const messages = obj.messages
+      .filter((m): m is { role: string; content: string } => !!m && typeof m === 'object' && typeof (m as { content?: unknown }).content === 'string' && typeof (m as { role?: unknown }).role === 'string')
+      .map((m) => ({ role: m.role, content: m.content.slice(0, 8000) }))
+      .filter((m) => ['user', 'assistant', 'system'].includes(m.role))
+    if (!messages.some((m) => m.role === 'system')) {
+      messages.unshift({ role: 'system', content: 'Responde de forma breve, directa y en español. Evita razonamientos largos.' })
+    }
+    if (messages.length === 0) {
+      event.sender.send(IpcChannels.aiChatChunk, { requestId, chunk: '', done: true, error: 'Sin mensajes.' })
+      return
+    }
+    const allowed = isSenderAllowed(describeSender(event), onlyMain(), ctx.devServerUrl)
+    if (!allowed) {
+      event.sender.send(IpcChannels.aiChatChunk, { requestId, chunk: '', done: true, error: 'Remitente no autorizado.' })
+      return
+    }
+    try {
+      const res = await fetch('https://text.pollinations.ai/openai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages, model: 'openai', stream: true })
+      })
+      if (!res.ok || !res.body) {
+        event.sender.send(IpcChannels.aiChatChunk, { requestId, chunk: '', done: true, error: `HTTP ${res.status}` })
+        return
+      }
+      const decoder = new TextDecoder()
+      let buffer = ''
+      for await (const value of res.body as AsyncIterable<Uint8Array>) {
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (!trimmed.startsWith('data:')) continue
+          const dataStr = trimmed.slice(5).trim()
+          if (dataStr === '[DONE]') continue
+          try {
+            const json = JSON.parse(dataStr) as { choices?: Array<{ delta?: { content?: string; reasoning?: string } }> }
+            const content = json.choices?.[0]?.delta?.content
+            if (typeof content === 'string' && content) {
+              event.sender.send(IpcChannels.aiChatChunk, { requestId, chunk: content, done: false })
+            }
+          } catch {
+            // ignore parse errors
+          }
+        }
+      }
+      event.sender.send(IpcChannels.aiChatChunk, { requestId, chunk: '', done: true })
+    } catch (err) {
+      event.sender.send(IpcChannels.aiChatChunk, { requestId, chunk: '', done: true, error: err instanceof Error ? err.message : String(err) })
+    }
+  })
+  registered.push(IpcChannels.aiChatStream)
 
   return () => {
     for (const channel of registered) ipcMain.removeHandler(channel)

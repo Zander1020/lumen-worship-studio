@@ -108,6 +108,9 @@ export const IpcChannels = {
 
   /** Asistente inteligente local */
   aiSuggestForTheme: 'ai:suggest-for-theme',
+  aiChat: 'ai:chat',
+  aiChatStream: 'ai:chat-stream',
+  aiChatChunk: 'ai:chat-chunk',
 
   /** Configuración */
   settingsGet: 'settings:get',

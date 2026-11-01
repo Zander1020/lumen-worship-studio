@@ -72,6 +72,8 @@ export interface BibleVersionInfo {
   id: string
   name: string
   builtIn: boolean
+  /** false = versión built-in sin texto incluido (debe importarse su XML) */
+  available?: boolean
 }
 
 export interface BibleVersionImportRequest {

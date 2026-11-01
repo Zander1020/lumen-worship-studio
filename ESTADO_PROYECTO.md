@@ -1,16 +1,16 @@
 # ESTADO ACTUAL Y MEMORIA DEL PROYECTO: LUMEN STUDIO
 **Fecha de corte:** 31 de Octubre de 2026  
-**Última versión publicada:** `v0.1.10`  
+**Última versión publicada:** `v0.1.11`  
 **Repositorio GitHub:** [https://github.com/Zander1020/lumen-worship-studio](https://github.com/Zander1020/lumen-worship-studio)  
-**Release activo:** `v0.1.10` (incluye `Lumen-Studio-Setup-0.1.10.exe` y `Lumen-Studio-Setup-0.1.10.exe.blockmap`)  
-**Rama principal:** `main` (al día con `origin/main` y tags `v0.1.8`, `v0.1.9` y `v0.1.10`)
+**Release activo:** `v0.1.11` (incluye `Lumen-Studio-Setup-0.1.11.exe` y `Lumen-Studio-Setup-0.1.11.exe.blockmap`) (pendiente de publicación)  
+**Rama principal:** `main` (al día con `origin/main` y tags `v0.1.8`, `v0.1.9`, `v0.1.10` y `v0.1.11`)
 
 ---
 
 ## 1. Visión General del Proyecto
 **Lumen Worship Studio** es un software de escritorio para Windows desarrollado con **Electron**, **Vite**, **React**, **TypeScript** y **Tailwind / CSS personalizado**. Está diseñado para la proyección y gestión de cultos eclesiásticos:
 - **Alabanzas:** Canciones con estrofas, coros, tonalidades, tags, importación desde Holyrics (`.mufl` y `.json`).
-- **Biblia:** 66 libros completos indexados localmente, con **múltiples versiones** (6 versiones clásicas embebidas + importación de versiones propias en XML formato Zefania/Holyrics) seleccionables en tiempo real.
+- **Biblia:** 66 libros completos indexados localmente, con **múltiples versiones**: 8 versiones clásicas con texto real incluido (RVR1960, RVR1909, NVI, DHH, LBLA, TLA, NTV, PDT) + importación de versiones propias en XML/XMM seleccionables en tiempo real.
 - **Medios:** Imágenes y vídeos a pantalla completa con categoría `Culto` o `Fondo`.
 - **Diapositivas y Presentaciones:** Compatibilidad con documentos PDF y PowerPoint (`.pptx`, `.ppt`, `.ppsx`, `.pps`, `.potx`) con renderizado Full HD (1080p).
 - **Proyección de Pantalla:** Ventana secundaria independiente para proyector o pantalla de transmisión con soporte de audio en videos proyectados y mute en previsualización de cabina.
@@ -80,14 +80,16 @@
 ### Completadas en esta sesión
 1. **Biblia multi-versión con importación propia:**
    - Parser XML Zefania (`src/shared/bibleImport.ts`, formato Holyrics) con 6 tests.
-   - `BibleRepository` multi-versión: 6 versiones clásicas embebidas, `listVersions`/`importVersion`/`deleteVersion`; versiones propias persistidas en `AppData\Roaming\Lumen Studio\bible\` (`versions.json` + `<id>.json`).
-   - `BiblePage`: selector de versión con optgroups (Clásicas / Mis versiones), botón ➕ importar con modal, 🗑 con `ConfirmDeleteModal`, búsqueda y proyección por versión.
-   - API nueva: `listBibleVersions`, `importBibleVersion`, `deleteBibleVersion`, `listBibleBooks(version)`, `searchBible(query, version)` (preload + `LumenApi` + validación IPC).
+   - `BibleRepository` multi-versión: 8 versiones con texto real incluido (RVR1960, RVR1909, NVI, DHH, LBLA, TLA, NTV, PDT), `listVersions`/`importVersion`/`deleteVersion`; versiones propias persistidas en `AppData\\Roaming\\Lumen Studio\\bible\\` (`versions.json` + `<id>.json`).
+   - Importar XML (Zefania) o .xmm (Holyrics) con nombre de una versión clásica (o su abreviatura) **completa esa ranura** y la convierte en el texto real de esa versión (en lugar de crear una entrada duplicada).
+   - `BiblePage`: selector de versión con optgroups (Clásicas / Mis versiones), versiones sin datos marcadas como "(sin datos)" y deshabilitadas con aviso + botón para importar; botón ➕ importar con modal, ✕ con `ConfirmDeleteModal`, búsqueda y proyección por versión.
+   - API: `listBibleVersions`, `importBibleVersion`, `deleteBibleVersion`, `listBibleBooks(version)`, `searchBible(query, version)` (preload + `LumenApi` + validación IPC).
 2. **Editor gráfico — formato LUMEN:** la extensión de proyecto se renombró de `.lumen-design` a `.lumen`; botón "LUMEN (Editable)", selector de formato PNG/LUMEN, acepta `.lumen,.lumen-design,.json` al abrir, calidad oculta para png/lumen.
 3. **Pestaña MEDIOS retirada del `HolyricsLeftDock`:** el dock izquierdo quedó exclusivo del cronograma.
 4. **Limpieza total de ESLint:** de ~85 errores a **0** (`eslint --fix` + correcciones manuales: `any`→tipos concretos, `unknown` en catches, condiciones redundantes de tipos, `queueMicrotask` para `set-state-in-effect`, extracción de `computeHolyricsOptimalFontSize` a `holyricsFontFit.ts` para `react-refresh`, `UpdateStatus` compartido en `src/shared/api.ts`).
+5. **Panel culto (HomePage, pestaña Medios):** cada fila muestra solo la miniatura (imagen o primer frame del vídeo) y el nombre del archivo; se eliminaron índice, subtítulo, categoría y botones por fila.
 
 ### Próximos pasos
-- El proyecto se encuentra completamente estable: `npm run check` y `npm run build` en verde, con la versión `v0.1.10` en producción.
+- El proyecto se encuentra estable: `npm run check` y `npm run build` en verde, con la versión `v0.1.10` lista para publicar (pendiente de autorización explícita del usuario).
 - Si el usuario reporta mejoras adicionales sobre diseño, animaciones de diapositivas o transiciones de video, mantener siempre la regla de separación de carpetas y aislamiento estricto de documentos.
 

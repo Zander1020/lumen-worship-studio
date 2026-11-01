@@ -21,6 +21,20 @@ extraResources:
     to: bd.mufl
   - from: out/main/es_rvr.json
     to: es_rvr.json
+  - from: out/main/es_rvr1909.json
+    to: es_rvr1909.json
+  - from: out/main/es_nvi.json
+    to: es_nvi.json
+  - from: out/main/es_dhh.json
+    to: es_dhh.json
+  - from: out/main/es_lbla.json
+    to: es_lbla.json
+  - from: out/main/es_tla.json
+    to: es_tla.json
+  - from: out/main/es_ntv.json
+    to: es_ntv.json
+  - from: out/main/es_pdt.json
+    to: es_pdt.json
   - from: lumen.png
     to: lumen.png
 win:

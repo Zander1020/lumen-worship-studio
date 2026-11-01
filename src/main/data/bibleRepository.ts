@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { BibleBookSummary, BibleVersionInfo, BibleVersionImportRequest, BibleVerse } from '../../shared/models'
-import { parseZefaniaXml } from '../../shared/bibleImport'
+import { parseBibleContent } from '../../shared/bibleImport'
 import { DEFAULT_BIBLE_VERSES } from './defaultSeeds'
 
 export interface RawBibleBook {
@@ -30,20 +30,62 @@ function normalizeText(text: string): string {
 
 let cachedBooks: IndexedBook[] | null = null
 
-function locateBibleJsonPath(): string | null {
+const BUILTIN_DATA_FILES: Record<string, string> = {
+  rvr1960: 'es_rvr.json',
+  rvr1909: 'es_rvr1909.json',
+  nvi: 'es_nvi.json',
+  dhh: 'es_dhh.json',
+  lbla: 'es_lbla.json',
+  tla: 'es_tla.json',
+  ntv: 'es_ntv.json',
+  pdt: 'es_pdt.json'
+}
+
+function locateDataJson(fileName: string): string | null {
   const candidates: string[] = [
-    join(__dirname, 'es_rvr.json'),
-    join(__dirname, '../data/es_rvr.json'),
-    join(__dirname, '../../src/main/data/es_rvr.json'),
-    join(process.cwd(), 'src/main/data/es_rvr.json')
+    join(__dirname, fileName),
+    join(__dirname, '../data', fileName),
+    join(__dirname, '../../src/main/data', fileName),
+    join(process.cwd(), 'src/main/data', fileName)
   ]
   if (typeof process.resourcesPath === 'string') {
-    candidates.unshift(join(process.resourcesPath, 'es_rvr.json'))
+    candidates.unshift(join(process.resourcesPath, fileName))
   }
   for (const candidate of candidates) {
     if (existsSync(candidate)) return candidate
   }
   return null
+}
+
+function loadIndexedFromFile(path: string): IndexedBook[] | null {
+  try {
+    const raw = readFileSync(path, 'utf-8').replace(/^\uFEFF/, '')
+    const parsed = JSON.parse(raw) as RawBibleBook[]
+    if (!Array.isArray(parsed) || parsed.length === 0) return null
+    return parsed.map((b, idx) => ({
+      index: idx,
+      abbrev: b.abbrev,
+      normAbbrev: normalizeText(b.abbrev),
+      name: b.name,
+      normName: normalizeText(b.name),
+      testament: idx < 39 ? 'AT' : 'NT',
+      chapters: b.chapters
+    }))
+  } catch {
+    return null
+  }
+}
+
+const dataBooksCache = new Map<string, IndexedBook[]>()
+
+function getDataBooks(fileName: string): IndexedBook[] | null {
+  const cached = dataBooksCache.get(fileName)
+  if (cached) return cached
+  const path = locateDataJson(fileName)
+  if (!path) return null
+  const books = loadIndexedFromFile(path)
+  if (books) dataBooksCache.set(fileName, books)
+  return books
 }
 
 function buildFallbackBooks(): IndexedBook[] {
@@ -87,28 +129,9 @@ function buildFallbackBooks(): IndexedBook[] {
 
 function getIndexedBooks(): IndexedBook[] {
   if (cachedBooks) return cachedBooks
-  const jsonPath = locateBibleJsonPath()
-  if (!jsonPath) {
-    cachedBooks = buildFallbackBooks()
-    return cachedBooks
-  }
-  try {
-    const raw = readFileSync(jsonPath, 'utf-8').replace(/^\uFEFF/, '')
-    const parsed = JSON.parse(raw) as RawBibleBook[]
-    cachedBooks = parsed.map((b, idx) => ({
-      index: idx,
-      abbrev: b.abbrev,
-      normAbbrev: normalizeText(b.abbrev),
-      name: b.name,
-      normName: normalizeText(b.name),
-      testament: idx < 39 ? 'AT' : 'NT',
-      chapters: b.chapters
-    }))
-    return cachedBooks
-  } catch {
-    cachedBooks = buildFallbackBooks()
-    return cachedBooks
-  }
+  const books = getDataBooks('es_rvr.json')
+  cachedBooks = books ?? buildFallbackBooks()
+  return cachedBooks
 }
 
 function findMatchingBook(bookQuery: string, books: readonly IndexedBook[]): IndexedBook | undefined {
@@ -125,166 +148,6 @@ function findMatchingBook(bookQuery: string, books: readonly IndexedBook[]): Ind
   )
 }
 
-export function normalizeBibleVersionName(raw?: string): string {
-  if (!raw) return 'Reina-Valera 1960'
-  const norm = raw.trim().toLowerCase()
-  if (norm.includes('1909')) return 'Reina-Valera 1909'
-  if (norm.includes('nvi') || norm.includes('internacional')) return 'Nueva Versión Internacional'
-  if (norm.includes('dhh') || norm.includes('dios habla hoy')) return 'Dios Habla Hoy'
-  if (norm.includes('lbla') || norm.includes('américas') || norm.includes('americas')) return 'La Biblia de las Américas'
-  if (norm.includes('tla') || norm.includes('lenguaje actual')) return 'Traducción en Lenguaje Actual'
-  return 'Reina-Valera 1960'
-}
-
-const FAMOUS_PASSAGES: Record<string, Record<string, string[]>> = {
-  'Salmos 23': {
-    'Nueva Versión Internacional': [
-      'El Señor es mi pastor, nada me falta;',
-      'en verdes pastos me hace descansar. Junto a tranquilas aguas me conduce;',
-      'me infunde nuevas fuerzas. Me guía por sendas de justicia por amor a su nombre.',
-      'Aun si voy por valles tenebrosos, no temo peligro alguno porque tú estás a mi lado; tu vara y tu bastón me dan seguridad.',
-      'Dispones ante mí un banquete en presencia de mis enemigos. Has ungido con perfume mi cabeza; has llenado mi copa a rebosar.',
-      'La bondad y el amor me seguirán todos los días de mi vida; y en la casa del Señor habitaré para siempre.'
-    ],
-    'Dios Habla Hoy': [
-      'El Señor es mi pastor; nada me falta.',
-      'En verdes praderas me hace descansar, a las aguas tranquilas me conduce,',
-      'me da nuevas fuerzas y me lleva por caminos rectos, haciendo honor a su nombre.',
-      'Aunque pase por el más oscuro de los valles, no temeré peligro alguno, porque tú, Señor, estás conmigo; tu vara y tu bastón me inspiran confianza.',
-      'Me has preparado un banquete ante los ojos de mis enemigos; has vertido perfume en mi cabeza y has llenado mi copa a rebosar.',
-      'Tu bondad y tu amor me acompañan a lo largo de mis días, y en tu casa, oh Señor, por siempre viviré.'
-    ],
-    'La Biblia de las Américas': [
-      'El SEÑOR es mi pastor, nada me faltará.',
-      'En lugares de verdes pastos me hace descansar; junto a aguas de reposo me conduce.',
-      'El restaura mi alma; me guía por senderos de justicia por amor de su nombre.',
-      'Aunque pase por el valle de sombra de muerte, no temeré mal alguno, porque tú estás conmigo; tu vara y tu cayado me infunden aliento.',
-      'Tú preparas mesa delante de mí en presencia de mis enemigos; has ungido mi cabeza con aceite; mi copa está rebosando.',
-      'Ciertamente el bien y la misericordia me seguirán todos los días de mi vida, y en la casa del SEÑOR moraré por largos días.'
-    ],
-    'Traducción en Lenguaje Actual': [
-      'Tú, Dios mío, eres mi pastor; contigo nada me falta.',
-      'Me haces descansar en verdes pastos, y para calmar mi sed me llevas a tranquilas aguas.',
-      'Me das nuevas fuerzas y me guías por el mejor camino, porque así eres tú.',
-      'Puedo cruzar lugares peligrosos y no tener miedo de nada, porque tú estás a mi lado; tu vara y tu bastón me dan seguridad.',
-      'Me preparas un banquete delante de mis enemigos; me recibes como a un invitado especial y llenas mi copa hasta el borde.',
-      'Tu bondad y tu amor me acompañan a lo largo de mis días, y en tu templo, oh Dios, viviré por siempre.'
-    ],
-    'Reina-Valera 1909': [
-      'Jehová es mi pastor; nada me faltará.',
-      'En lugares de delicados pastos me hará yacer: Junto á aguas de reposo me pastoreará.',
-      'Confortará mi alma; Guiaráme por sendas de justicia por amor de su nombre.',
-      'Aunque ande en valle de sombra de muerte, No temeré mal alguno; porque tú estarás conmigo: Tu vara y tu cayado me infundirán aliento.',
-      'Aderezas mesa delante de mí, en presencia de mis angustiadores: Ungiste mi cabeza con aceite; mi copa está rebosando.',
-      'Ciertamente el bien y la misericordia me seguirán todos los días de mi vida: Y en la casa de Jehová moraré por largos días.'
-    ]
-  },
-  'Juan 3': {
-    'Nueva Versión Internacional': [
-      'Había entre los fariseos un hombre llamado Nicodemo, un líder de los judíos.',
-      'Este vino a Jesús de noche y le dijo: Rabí, sabemos que has venido de Dios como maestro; porque nadie puede hacer estas señales que tú haces si Dios no está con él.',
-      'Jesús le respondió: De cierto, de cierto te digo que el que no nace de nuevo no puede ver el reino de Dios.',
-      'Nicodemo le preguntó: ¿Cómo puede un hombre nacer siendo ya viejo? ¿Acaso puede entrar por segunda vez en el vientre de su madre y nacer?',
-      'Jesús respondió: De cierto, de cierto te digo que el que no nace de agua y del Espíritu no puede entrar en el reino de Dios.',
-      'Lo que nace de la carne, carne es; y lo que nace del Espíritu, espíritu es.',
-      'No te sorprendas de que te haya dicho: Tienen que nacer de nuevo.',
-      'El viento sopla donde quiere, y oyes su sonido, pero no sabes de dónde viene ni a dónde va; así es todo aquel que nace del Espíritu.',
-      'Nicodemo le preguntó: ¿Cómo puede suceder esto?',
-      'Jesús le respondió: ¿Tú eres maestro de Israel y no entiendes estas cosas?',
-      'De cierto, de cierto te digo que hablamos de lo que sabemos y testificamos de lo que hemos visto, pero ustedes no aceptan nuestro testimonio.',
-      'Si les he hablado de las cosas terrenales y no creen, ¿cómo van a creer si les hablo de las celestiales?',
-      'Nadie ha subido al cielo sino el que descendió del cielo, el Hijo del Hombre.',
-      'Y como Moisés levantó la serpiente en el desierto, así es necesario que el Hijo del Hombre sea levantado,',
-      'para que todo el que crea en él tenga vida eterna.',
-      'Porque tanto amó Dios al mundo que dio a su Hijo unigénito, para que todo el que cree en él no se pierda, sino que tenga vida eterna.',
-      'Porque Dios no envió a su Hijo al mundo para condenar al mundo, sino para que el mundo sea salvo por él.'
-    ],
-    'Dios Habla Hoy': [
-      'Había un fariseo llamado Nicodemo, que era un hombre importante entre los judíos.',
-      'Este fue de noche a visitar a Jesús, y le dijo: Maestro, sabemos que Dios te ha enviado a enseñarnos, porque nadie podría hacer los milagros que tú haces, si Dios no estuviera con él.',
-      'Jesús le contestó: Te aseguro que el que no nace de nuevo, no puede ver el reino de Dios.',
-      'Nicodemo le preguntó: ¿Y cómo puede uno nacer cuando ya es viejo? ¿Acaso puede entrar otra vez en el vientre de su madre, y nacer?',
-      'Jesús le respondió: Te aseguro que el que no nace del agua y del Espíritu, no puede entrar en el reino de Dios.',
-      'Lo que nace de padres humanos, es humano; únicamente el Espíritu da vida espiritual.',
-      'No te sorprendas de que te haya dicho: Ustedes tienen que nacer de nuevo.',
-      'El viento sopla por donde quiere, y aunque oyes su ruido, no sabes de dónde viene ni a dónde va. Así son también todos los que nacen del Espíritu.',
-      'Nicodemo volvió a preguntarle: ¿Cómo puede ser esto?',
-      'Jesús le contestó: ¿Tú eres maestro de Israel, y no lo sabes?',
-      'Te aseguro que nosotros hablamos de lo que sabemos, y somos testigos de lo que hemos visto; pero ustedes no aceptan nuestro testimonio.',
-      'Si no me creen cuando les hablo de las cosas de la tierra, ¿cómo me van a creer si les hablo de las cosas del cielo?',
-      'Nadie ha subido al cielo sino el que bajó del cielo, es decir, el Hijo del hombre.',
-      'Y así como Moisés levantó la serpiente de bronce en el desierto, así también tiene que ser levantado el Hijo del hombre,',
-      'para que todo el que cree en él tenga vida eterna.',
-      'Pues Dios amó tanto al mundo, que dio a su Hijo único, para que todo aquel que cree en él no muera, sino que tenga vida eterna.',
-      'Porque Dios no envió a su Hijo al mundo para condenar al mundo, sino para salvarlo.'
-    ]
-  }
-}
-
-function adaptVerseText(
-  baseText: string,
-  bookName: string,
-  chapter: number,
-  verse: number,
-  version: string
-): string {
-  if (version === 'Reina-Valera 1960') return baseText
-
-  const key = `${bookName} ${chapter}`
-  const passageMap = FAMOUS_PASSAGES[key]
-  const knownVerse = passageMap ? passageMap[version]?.[verse - 1] : undefined
-  if (knownVerse) {
-    return knownVerse
-  }
-
-  let text = baseText
-  if (version === 'Nueva Versión Internacional') {
-    text = text
-      .replace(/^Jehová\b/, 'El Señor')
-      .replace(/\bJehová\b/g, 'el Señor')
-      .replace(/delicados pastos/gi, 'verdes pastos')
-      .replace(/aguas de reposo/gi, 'tranquilas aguas')
-      .replace(/\bvosotros\b/gi, 'ustedes')
-      .replace(/\bvosotras\b/gi, 'ustedes')
-      .replace(/\bos\b/g, 'les')
-      .replace(/\bvuestro\b/gi, 'su')
-      .replace(/\bvuestra\b/gi, 'su')
-      .replace(/\bvuestros\b/gi, 'sus')
-      .replace(/\bvuestras\b/gi, 'sus')
-      .replace(/\bsois\b/g, 'son')
-      .replace(/\bhabéis\b/g, 'han')
-      .replace(/\btenéis\b/g, 'tienen')
-      .replace(/\bpodéis\b/g, 'pueden')
-      .replace(/\bsabéis\b/g, 'saben')
-      .replace(/\bdecís\b/g, 'dicen')
-  } else if (version === 'Dios Habla Hoy') {
-    text = text
-      .replace(/^Jehová\b/, 'El Señor')
-      .replace(/\bJehová\b/g, 'el Señor')
-      .replace(/delicados pastos/gi, 'verdes praderas')
-      .replace(/aguas de reposo/gi, 'aguas tranquilas')
-      .replace(/\bvosotros\b/gi, 'ustedes')
-      .replace(/\bos\b/g, 'les')
-      .replace(/\bvuestro\b/gi, 'su')
-      .replace(/\bvuestros\b/gi, 'sus')
-  } else if (version === 'La Biblia de las Américas') {
-    text = text
-      .replace(/\bJehová\b/g, 'el SEÑOR')
-      .replace(/sendas de justicia/gi, 'senderos de justicia')
-  } else if (version === 'Traducción en Lenguaje Actual') {
-    text = text
-      .replace(/^Jehová\b/, 'Dios')
-      .replace(/\bJehová\b/g, 'Dios')
-      .replace(/delicados pastos/gi, 'verdes pastos')
-      .replace(/aguas de reposo/gi, 'tranquilas aguas')
-      .replace(/\bvosotros\b/gi, 'ustedes')
-      .replace(/\bos\b/g, 'les')
-  } else if (version === 'Reina-Valera 1909') {
-    text = text.replace(/unto a/g, 'unto á')
-  }
-  return text
-}
-
 interface StoredVersionEntry {
   id: string
   name: string
@@ -299,21 +162,37 @@ export const BUILTIN_BIBLE_VERSIONS: BibleVersionInfo[] = [
   { id: 'nvi', name: 'Nueva Versión Internacional', builtIn: true },
   { id: 'dhh', name: 'Dios Habla Hoy', builtIn: true },
   { id: 'lbla', name: 'La Biblia de las Américas', builtIn: true },
-  { id: 'tla', name: 'Traducción en Lenguaje Actual', builtIn: true }
+  { id: 'tla', name: 'Traducción en Lenguaje Actual', builtIn: true },
+  { id: 'ntv', name: 'Nueva Traducción Viviente', builtIn: true },
+  { id: 'pdt', name: 'Palabra de Dios para Todos', builtIn: true }
 ]
 
+/** Si el nombre/abbrev de una importación coincide con una versión built-in, la importación completa esa ranura. */
+function findBuiltinSlot(name: string, abbrev?: string): BibleVersionInfo | undefined {
+  const normName = normalizeText(name)
+  const normAbbrev = abbrev?.trim() ? normalizeText(abbrev) : ''
+  return BUILTIN_BIBLE_VERSIONS.find(
+    (v) =>
+      normName === v.id ||
+      normName === normalizeText(v.name) ||
+      normName.startsWith(`${v.id} `) ||
+      normName.startsWith(`${normalizeText(v.name)} `) ||
+      normAbbrev === v.id
+  )
+}
+
 /**
- * Repositorio de la Biblia completa en español (66 libros, 1.189 capítulos, 31.104 versículos)
- * con soporte de versiones propias importadas en formato XML Zefania (el que usa Holyrics),
- * almacenadas en `bibleDir` (`versions.json` + `<id>.json`).
+ * Repositorio de la Biblia completa en español (66 libros) con textos incluidos de
+ * Reina-Valera 1960 y Reina-Valera 1909 (dominio público), versiones built-in que
+ * requieren importar el XML del usuario (NVI, DHH, LBLA, TLA) y versiones propias
+ * importadas en formato XML Zefania (el que usa Holyrics), almacenadas en `bibleDir`
+ * (`versions.json` + `<id>.json`).
  */
 export class BibleRepository {
-  private readonly books: readonly IndexedBook[]
   private readonly bibleDir: string | undefined
   private readonly versionBooksCache = new Map<string, IndexedBook[]>()
 
   constructor(bibleDir?: string) {
-    this.books = getIndexedBooks()
     this.bibleDir = bibleDir
   }
 
@@ -356,32 +235,49 @@ export class BibleRepository {
   }
 
   listVersions(): BibleVersionInfo[] {
+    const manifest = this.readManifest()
     return [
-      ...BUILTIN_BIBLE_VERSIONS,
-      ...this.readManifest().map((e) => ({ id: e.id, name: e.name, builtIn: false }))
+      ...BUILTIN_BIBLE_VERSIONS.map((v) => {
+        const dataFile = BUILTIN_DATA_FILES[v.id]
+        const hasData = dataFile ? getDataBooks(dataFile) !== null : false
+        return { ...v, available: hasData || manifest.some((e) => e.id === v.id) }
+      }),
+      ...manifest
+        .filter((e) => !BUILTIN_BIBLE_VERSIONS.some((v) => v.id === e.id))
+        .map((e) => ({ id: e.id, name: e.name, builtIn: false, available: true }))
     ]
   }
 
-  /** Importa una Biblia en XML Zefania (formato Holyrics) y la registra como versión propia. */
+  /**
+   * Importa una Biblia en XML Zefania (formato Holyrics) y la registra como versión propia.
+   * Si el nombre coincide con una versión built-in (p. ej. "NVI"), la importación completa
+   * esa ranura y se convierte en el texto real de esa versión.
+   */
   importVersion(request: BibleVersionImportRequest): BibleVersionInfo[] {
-    const parsedBooks = parseZefaniaXml(request.content)
+    const parsedBooks = parseBibleContent(request.content, request.fileName)
     const name = request.name.trim().slice(0, 80)
     if (!name) throw new Error('La versión necesita un nombre.')
 
     const manifest = this.readManifest()
-    const base =
-      name
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-        .slice(0, 40) || 'version'
-    let id = base
-    let suffix = 2
-    while (manifest.some((e) => e.id === id) || BUILTIN_BIBLE_VERSIONS.some((v) => v.id === id)) {
-      id = `${base}-${suffix}`
-      suffix += 1
+    const slot = findBuiltinSlot(name, request.abbrev)
+    let id: string
+    if (slot) {
+      id = slot.id
+    } else {
+      const base =
+        name
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+          .slice(0, 40) || 'version'
+      id = base
+      let suffix = 2
+      while (manifest.some((e) => e.id === id)) {
+        id = `${base}-${suffix}`
+        suffix += 1
+      }
     }
 
     const fileName = `${id}.json`
@@ -396,17 +292,17 @@ export class BibleRepository {
 
     const entry: StoredVersionEntry = {
       id,
-      name,
+      name: slot ? slot.name : name,
       ...(request.abbrev?.trim() ? { abbrev: request.abbrev.trim().slice(0, 16) } : {}),
       fileName,
       importedAt: new Date().toISOString()
     }
-    this.writeManifest([...manifest, entry])
+    this.writeManifest([...manifest.filter((e) => e.id !== id), entry])
     this.versionBooksCache.delete(id)
     return this.listVersions()
   }
 
-  /** Elimina una versión propia (las integradas no se pueden eliminar). */
+  /** Elimina una versión propia (una importación sobre una ranura built-in sí se puede eliminar; las ranuras puras no existen en el manifiesto). */
   deleteVersion(id: string): BibleVersionInfo[] {
     const manifest = this.readManifest()
     const entry = manifest.find((e) => e.id === id)
@@ -459,16 +355,23 @@ export class BibleRepository {
     }
   }
 
-  /** Resuelve qué libros y etiqueta de versión usar según la versión pedida. */
+  /** Resuelve qué libros, etiqueta y disponibilidad usar según la versión pedida. */
   private resolveVersion(
     version?: string
-  ): { books: readonly IndexedBook[]; versionLabel: string; isImported: boolean } {
+  ): { books: readonly IndexedBook[]; versionLabel: string; isImported: boolean; available: boolean } {
     const entry = this.findStoredEntry(version)
     if (entry) {
       const stored = this.getStoredBooks(entry)
-      if (stored) return { books: stored, versionLabel: entry.name, isImported: true }
+      if (stored) return { books: stored, versionLabel: entry.name, isImported: true, available: true }
     }
-    return { books: this.books, versionLabel: normalizeBibleVersionName(version), isImported: false }
+    const raw = version?.trim() || 'rvr1960'
+    const normRaw = normalizeText(raw)
+    const builtin = BUILTIN_BIBLE_VERSIONS.find((v) => v.id === raw || normalizeText(v.name) === normRaw)
+    if (builtin) {
+      const books = builtin.id === 'rvr1960' ? getIndexedBooks() : getDataBooks(BUILTIN_DATA_FILES[builtin.id] ?? '')
+      if (books) return { books, versionLabel: builtin.name, isImported: false, available: true }
+    }
+    return { books: [], versionLabel: raw, isImported: false, available: false }
   }
 
   listBooks(version?: string): BibleBookSummary[] {
@@ -487,7 +390,7 @@ export class BibleRepository {
   }
 
   getChapter(book: string, chapter: number, version?: string): BibleVerse[] {
-    const { books, versionLabel, isImported } = this.resolveVersion(version)
+    const { books, versionLabel } = this.resolveVersion(version)
     const target = findMatchingBook(book, books)
     if (!target) return []
     const verses = target.chapters[chapter - 1]
@@ -496,15 +399,11 @@ export class BibleRepository {
     const result: BibleVerse[] = []
     verses.forEach((text, idx) => {
       if (text) {
-        const verseNum = idx + 1
-        const verseText = isImported
-          ? text
-          : adaptVerseText(text, target.name, chapter, verseNum, versionLabel)
         result.push({
           book: target.name,
           chapter,
-          verse: verseNum,
-          text: verseText,
+          verse: idx + 1,
+          text,
           version: versionLabel
         })
       }
@@ -514,7 +413,7 @@ export class BibleRepository {
 
   search(query: string, limit = 60, version?: string): BibleVerse[] {
     const trimmed = query.trim()
-    const { books, versionLabel, isImported } = this.resolveVersion(version)
+    const { books, versionLabel } = this.resolveVersion(version)
     if (!trimmed) {
       return this.getChapter('Salmos', 23, version)
     }
@@ -556,15 +455,11 @@ export class BibleRepository {
           if (!text) continue
           const normVerse = normalizeText(text)
           if (terms.every((t) => normVerse.includes(t))) {
-            const verseNum = vIdx + 1
-            const verseText = isImported
-              ? text
-              : adaptVerseText(text, b.name, chIdx + 1, verseNum, versionLabel)
             matches.push({
               book: b.name,
               chapter: chIdx + 1,
-              verse: verseNum,
-              text: verseText,
+              verse: vIdx + 1,
+              text,
               version: versionLabel
             })
             if (matches.length >= limit) return matches

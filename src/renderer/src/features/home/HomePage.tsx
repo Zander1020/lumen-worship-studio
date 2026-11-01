@@ -597,57 +597,6 @@ export function HomePage({ app }: HomePageProps) {
     }
   }
 
-  const addMediaToSchedule = (img: MediaBackground): void => {
-    const mediaVal = isVideoUrl(img.value) ? resolveMediaVideoUrl(img.value) : img.value
-    const isVid = img.kind === 'video' || isVideoUrl(img.value)
-
-    const matchSchedule = app.schedule.find(
-      (s) =>
-        s.title.toLowerCase().includes(img.name.toLowerCase()) ||
-        img.name.toLowerCase().includes(s.title.toLowerCase().replace(/^(pdf|powerpoint):\s*/i, ''))
-    )
-    const deckSlides: PresentationSlide[] =
-      img.slides && img.slides.length > 0
-        ? img.slides
-        : matchSchedule && matchSchedule.slides.length > 0
-          ? matchSchedule.slides
-          : [
-              {
-                id: `media-deck-${img.id}`,
-                sourceKind: 'custom',
-                sourceTitle: img.name,
-                label: img.name,
-                lines: [],
-                footer: '',
-                imageUrl: mediaVal,
-                mediaKind: isVid ? 'video' : 'image'
-              }
-            ]
-
-    const isPres =
-      img.name.toLowerCase().includes('pdf') ||
-      img.name.toLowerCase().includes('powerpoint') ||
-      deckSlides.length > 1
-    const title = isPres
-      ? img.name.toLowerCase().includes('pdf')
-        ? `PDF: ${img.name}`
-        : `PowerPoint: ${img.name}`
-      : `${isVid ? 'Vídeo' : 'Imagen'}: ${img.name}`
-    const subtitle = deckSlides.length > 1 ? `${deckSlides.length} diapositivas` : isVid ? 'Vídeo del culto' : 'Imagen del culto'
-
-    void app.addScheduleItem({
-      kind: 'announcement',
-      title,
-      subtitle,
-      slides: deckSlides
-    })
-  }
-
-  const previewMedia = (img: MediaBackground): void => {
-    setSelectedImageId(img.id)
-    projectMediaImmediately(img, false)
-  }
-
   return (
     <section className="page hly-page" aria-labelledby="page-title">
       <header className="hly-module-bar hly-module-bar--compact">
@@ -1229,17 +1178,17 @@ export function HomePage({ app }: HomePageProps) {
                   </div>
                 ) : (
                   <div className="hly-table-list" role="list" style={{ padding: '4px 6px' }}>
-                    {filteredMedia.map((m, idx) => {
+                    {filteredMedia.map((m) => {
                       const isSelected = selectedMedia?.id === m.id
                       const isVid = m.kind === 'video' || isVideoUrl(m.value)
                       const isLive = live?.deckTitle === `${isVid ? 'Vídeo' : 'Imagen'}: ${m.name}` || live?.deckTitle === m.name
-                      const hasSlides = m.slides && m.slides.length > 0
                       return (
                         <div
                           key={m.id}
                           role="listitem"
                           className={`hly-playlist-row${isLive ? ' hly-playlist-row--active' : ''}${isSelected ? ' hly-playlist-row--selected' : ''}`}
                           style={{ cursor: 'pointer', padding: '4px 8px' }}
+                          title={m.name}
                           onClick={() => {
                             setSelectedImageId(m.id)
                           }}
@@ -1249,13 +1198,10 @@ export function HomePage({ app }: HomePageProps) {
                             className="hly-playlist-row__main"
                             style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: 0, color: 'inherit', cursor: 'pointer' }}
                           >
-                            <span className="hly-playlist-row__idx" style={{ fontSize: 11, width: 20, textAlign: 'right', color: 'var(--text-muted)' }}>
-                              {String(idx + 1).padStart(2, '0')}
-                            </span>
                             <div
                               style={{
-                                width: 44,
-                                height: 30,
+                                width: 56,
+                                height: 38,
                                 borderRadius: 4,
                                 overflow: 'hidden',
                                 background: '#0a0e17',
@@ -1267,100 +1213,31 @@ export function HomePage({ app }: HomePageProps) {
                                 position: 'relative'
                               }}
                             >
+                              <span style={{ fontSize: 14 }}>{isVid ? '🎬' : '🖼'}</span>
                               {isVid ? (
-                                <span style={{ fontSize: 14 }}>🎬</span>
-                              ) : m.value.startsWith('data:image') || m.value.startsWith('http') || m.value.startsWith('lumen-media:') ? (
+                                <video
+                                  src={`${m.value}#t=0.1`}
+                                  muted
+                                  preload="metadata"
+                                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none'
+                                  }}
+                                />
+                              ) : (
                                 <img
                                   src={m.value}
                                   alt=""
-                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                />
-                              ) : (
-                                <span style={{ fontSize: 14 }}>🖼</span>
-                              )}
-                              {isVid && (
-                                <span
-                                  style={{
-                                    position: 'absolute',
-                                    bottom: 1,
-                                    right: 1,
-                                    fontSize: 8,
-                                    fontWeight: 800,
-                                    padding: '0 2px',
-                                    borderRadius: 2,
-                                    background: 'rgba(234, 88, 12, 0.9)',
-                                    color: '#fff',
-                                    lineHeight: 1
+                                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none'
                                   }}
-                                >
-                                  ▶
-                                </span>
+                                />
                               )}
                             </div>
-                            <div className="hly-playlist-row__info" style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
-                              <span className="hly-playlist-row__title" style={{ fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {m.name}
-                              </span>
-                              <span className="hly-playlist-row__sub" style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                                {hasSlides ? `${m.slides?.length} diapositivas` : isVid ? 'Vídeo' : 'Imagen'} {m.category ? `· ${m.category}` : ''}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="hly-playlist-row__actions" style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                            <button
-                              type="button"
-                              className="hly-icon-btn"
-                              title="Añadir al orden del culto"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                addMediaToSchedule(m)
-                              }}
-                            >
-                              ➕
-                            </button>
-                            <button
-                              type="button"
-                              className="hly-icon-btn"
-                              title="Vista previa en cabina"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                previewMedia(m)
-                              }}
-                            >
-                              👁
-                            </button>
-                            <button
-                              type="button"
-                              className="hly-icon-btn hly-icon-btn--primary"
-                              title="Proyectar en vivo (doble clic)"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                projectMediaImmediately(m, true)
-                              }}
-                            >
-                              ▶
-                            </button>
-                            <button
-                              type="button"
-                              className="hly-icon-btn hly-icon-btn--danger"
-                              title="Eliminar medio"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setDeleteConfirm({
-                                  isOpen: true,
-                                  title: '¿Eliminar archivo multimedia?',
-                                  itemName: m.name,
-                                  itemType: m.kind === 'video' ? 'vídeo' : 'imagen',
-                                  onConfirm: () => {
-                                    void app.deleteMedia(m.id)
-                                    setDeleteConfirm((prev) => ({ ...prev, isOpen: false }))
-                                  }
-                                })
-                              }}
-                            >
-                              ✕
-                            </button>
+                            <span className="hly-playlist-row__title" style={{ fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
+                              {m.name}
+                            </span>
                           </div>
                         </div>
                       )

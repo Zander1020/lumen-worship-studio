@@ -1,225 +1,197 @@
-import { useState } from 'react'
-import type { AiSuggestionResult } from '../../../../shared/ipc'
-import { songToSlides, versesToSlides } from '../../../../shared/slideHelpers'
+import { useEffect, useState, type KeyboardEvent } from 'react'
 import type { UseAppStatus } from '../../hooks/useAppStatus'
+import { askPollinations, type AiMessage } from '../../lib/aiChat'
 
 export interface AiAssistantPageProps {
-  app: UseAppStatus
+  app?: UseAppStatus
 }
 
-const QUICK_THEMES = [
-  'Gracia y Salvación',
-  'Santidad y Adoración',
-  'Fe y Fortaleza',
-  'Alabanza y Gratitud',
-  'Paz y Refugio'
-]
+const STORAGE_KEY = 'lumen-ai-chat'
 
-export function AiAssistantPage({ app }: AiAssistantPageProps) {
-  const [themeQuery, setThemeQuery] = useState('Gracia y Salvación')
-  const [result, setResult] = useState<AiSuggestionResult | null>(null)
-  const [rawTextToFormat, setRawTextToFormat] = useState('')
-  const [formattedPreview, setFormattedPreview] = useState<string>('')
+function loadHistory(): AiMessage[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(
+      (m): m is AiMessage =>
+        !!m &&
+        typeof m === 'object' &&
+        typeof (m as AiMessage).role === 'string' &&
+        typeof (m as AiMessage).content === 'string'
+    )
+  } catch {
+    return []
+  }
+}
 
-  const handleGenerate = async (topic?: string): Promise<void> => {
-    const target = topic ?? themeQuery
-    setThemeQuery(target)
-    const res = await app.suggestForTheme(target)
-    if (res) setResult(res)
+function saveHistory(messages: AiMessage[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(messages))
+  } catch {
+    // ignore quota errors
+  }
+}
+
+export function AiAssistantPage() {
+  const [messages, setMessages] = useState<AiMessage[]>(() => loadHistory())
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    saveHistory(messages)
+  }, [messages])
+
+  const handleSend = async (): Promise<void> => {
+    const text = input.trim()
+    if (!text || loading) return
+    const next: AiMessage[] = [...messages, { role: 'user', content: text }]
+    setMessages(next)
+    setInput('')
+    setLoading(true)
+
+    const api = (window as unknown as { lumen?: { chatWithAIStream?: (r: { messages: { role: string; content: string }[]; requestId: string }) => Promise<void>; onAIChatChunk?: (l: (p: { requestId: string; chunk: string; done: boolean; error?: string }) => void) => () => void } }).lumen
+    const streamFn = api?.chatWithAIStream
+    const listenFn = api?.onAIChatChunk
+    if (streamFn && listenFn) {
+      const requestId = (typeof crypto !== 'undefined' && 'randomUUID' in crypto) ? crypto.randomUUID() : String(Date.now())
+      setMessages([...next, { role: 'assistant', content: '' }])
+      const unsubscribe = listenFn((payload) => {
+        if (payload.requestId !== requestId) return
+        if (payload.error) {
+          setMessages((prev) => {
+            const copy = [...prev]
+            const last = copy[copy.length - 1]
+            if (last && last.role === 'assistant') last.content = `Error: ${payload.error}`
+            return copy
+          })
+          setLoading(false)
+          unsubscribe()
+          return
+        }
+        if (payload.chunk) {
+          setMessages((prev) => {
+            const copy = [...prev]
+            const last = copy[copy.length - 1]
+            if (last && last.role === 'assistant') last.content += payload.chunk
+            return copy
+          })
+        }
+        if (payload.done) {
+          setLoading(false)
+          unsubscribe()
+        }
+      })
+      try {
+        await streamFn({ messages: next, requestId })
+      } catch (err) {
+        setMessages((prev) => {
+          const copy = [...prev]
+          const last = copy[copy.length - 1]
+          if (last && last.role === 'assistant') last.content = `Error: ${err instanceof Error ? err.message : String(err)}`
+          return copy
+        })
+        setLoading(false)
+        unsubscribe()
+      }
+    } else {
+      const reply = await askPollinations(next)
+      setMessages([...next, { role: 'assistant', content: reply }])
+      setLoading(false)
+    }
   }
 
-  const handleAddCompleteService = async (): Promise<void> => {
-    if (!result) return
-    await app.addScheduleItem({
-      kind: 'announcement',
-      title: result.suggestedAnnouncement.sourceTitle,
-      subtitle: 'Bienvenida temática sugerida',
-      slides: [result.suggestedAnnouncement]
-    })
-    for (const song of result.suggestedSongs.slice(0, 2)) {
-      await app.addScheduleItem({
-        kind: 'song',
-        title: song.title,
-        subtitle: `${song.author} · Tono ${song.musicalKey}`,
-        refId: song.id,
-        slides: songToSlides(song)
-      })
-    }
-    const firstVerse = result.suggestedVerses[0]
-    if (firstVerse) {
-      await app.addScheduleItem({
-        kind: 'bible',
-        title: `Lectura sobre ${result.theme} (${firstVerse.book} ${firstVerse.chapter}:${firstVerse.verse})`,
-        subtitle: 'Pasaje sugerido · Reina-Valera 1909',
-        slides: versesToSlides(result.suggestedVerses)
-      })
+  const handleClear = (): void => {
+    setMessages([])
+    try {
+      localStorage.removeItem(STORAGE_KEY)
+    } catch {
+      // ignore
     }
   }
 
-  const handleFormatLyrics = async (): Promise<void> => {
-    if (!rawTextToFormat.trim()) return
-    const stanzas = await app.parseRawLyrics(rawTextToFormat)
-    const formatted = stanzas
-      .map((s) => `[${s.label}]\n${s.lines.join('\n')}`)
-      .join('\n\n')
-    setFormattedPreview(formatted)
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>): void => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      void handleSend()
+    }
   }
 
   return (
     <section className="page" aria-labelledby="page-title">
       <header className="page__header">
         <h1 id="page-title">Inteligencia artificial</h1>
-        <p className="page__description">
-          Asistente inteligente local (100 % sin conexión externa) para armar el orden del culto por tema y estructurar
-          letras automáticamente.
-        </p>
+        <p className="page__description">Chat gratuito con IA para responder tus preguntas.</p>
       </header>
 
       <div className="card">
-        <h2 className="card__title">Generador temático de culto (Motor Semántico Local)</h2>
-        <div className="form-grid">
-          <label className="field" style={{ gridColumn: '1 / -1' }}>
-            <span>Tema de la predicación o servicio</span>
-            <div className="button-row">
-              <input
-                type="text"
-                aria-label="Tema del culto"
-                style={{ flex: 1 }}
-                placeholder="Ej. Gracia, Fe en la prueba, Santidad..."
-                value={themeQuery}
-                onChange={(e) => setThemeQuery(e.target.value)}
-              />
-              <button
-                type="button"
-                className="button button--primary"
-                onClick={() => void handleGenerate()}
-              >
-                Sugerir alabanzas y pasajes
-              </button>
-            </div>
-          </label>
+        <div className="card__header-row" style={{ marginBottom: 12 }}>
+          <h2 className="card__title" style={{ margin: 0 }}>Chat con IA</h2>
+          <button type="button" className="button" onClick={handleClear} disabled={messages.length === 0}>
+            Limpiar
+          </button>
         </div>
-
-        <div className="button-row" style={{ marginTop: 10 }}>
-          {QUICK_THEMES.map((t) => (
-            <button
-              key={t}
-              type="button"
-              className="button"
-              onClick={() => void handleGenerate(t)}
+        <div
+          style={{
+            height: 420,
+            overflowY: 'auto',
+            border: '1px solid var(--border, #2a2f3a)',
+            borderRadius: 8,
+            padding: 10,
+            background: 'var(--bg-panel, #0f1419)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8
+          }}
+        >
+          {messages.length === 0 && (
+            <p className="hint" style={{ margin: 'auto', textAlign: 'center' }}>
+              Haz una pregunta para comenzar.
+            </p>
+          )}
+          {messages.map((m, idx) => (
+            <div
+              key={idx}
+              style={{
+                alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
+                maxWidth: '85%',
+                padding: '8px 12px',
+                borderRadius: 10,
+                background: m.role === 'user' ? 'var(--accent, #2563eb)' : 'var(--bg, #1a2234)',
+                color: m.role === 'user' ? '#fff' : 'inherit',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                fontSize: 14
+              }}
             >
-              ✦ {t}
-            </button>
+              {m.content || (loading && m.role === 'assistant' ? '…' : '')}
+            </div>
           ))}
         </div>
-
-        {result && (
-          <div style={{ marginTop: 16 }} data-testid="ai-suggestion-results">
-            <div className="card__header-row" style={{ marginBottom: 12 }}>
-              <h3 className="card__title" style={{ margin: 0 }}>
-                Propuesta para «{result.theme}»
-              </h3>
-              <button
-                type="button"
-                className="button button--primary"
-                onClick={() => void handleAddCompleteService()}
-              >
-                + Añadir servicio sugerido a Programación
-              </button>
-            </div>
-
-            <div className="grid">
-              <div>
-                <h4 className="card__title">Alabanzas recomendadas</h4>
-                <ul className="item-list">
-                  {result.suggestedSongs.map((song) => (
-                    <li key={song.id} className="item-row">
-                      <div>
-                        <div className="item-row__title">{song.title}</div>
-                        <div className="item-row__sub">
-                          Tono {song.musicalKey} · {song.tags.join(', ')}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className="button"
-                        onClick={() =>
-                          void app.loadProjectionDeck({
-                            deckTitle: song.title,
-                            slides: songToSlides(song),
-                            startIndex: 0
-                          })
-                        }
-                      >
-                        Proyectar
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div>
-                <h4 className="card__title">Versículos sugeridos</h4>
-                <ul className="item-list">
-                  {result.suggestedVerses.map((v) => (
-                    <li key={`${v.book}-${v.chapter}-${v.verse}`} className="item-row">
-                      <div>
-                        <div className="item-row__title">
-                          {v.book} {v.chapter}:{v.verse}
-                        </div>
-                        <div className="item-row__sub">{v.text}</div>
-                      </div>
-                      <button
-                        type="button"
-                        className="button"
-                        onClick={() =>
-                          void app.loadProjectionDeck({
-                            deckTitle: `${v.book} ${v.chapter}:${v.verse}`,
-                            slides: versesToSlides([v]),
-                            startIndex: 0
-                          })
-                        }
-                      >
-                        Proyectar
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="card">
-        <h2 className="card__title">Estructurador automático de estrofas</h2>
-        <p className="hint" style={{ marginTop: 0, marginBottom: 10 }}>
-          Pega una letra sin formato y el asistente separará y etiquetará las estrofas automáticamente.
-        </p>
-        <div className="grid">
-          <label className="field">
-            <span>Texto sin formato</span>
-            <textarea
-              rows={5}
-              placeholder="Pega aquí los párrafos de la canción..."
-              value={rawTextToFormat}
-              onChange={(e) => setRawTextToFormat(e.target.value)}
-            />
-          </label>
-          <label className="field">
-            <span>Resultado estructurado</span>
-            <textarea rows={5} readOnly value={formattedPreview} />
-          </label>
-        </div>
         <div className="button-row" style={{ marginTop: 10 }}>
+          <input
+            type="text"
+            aria-label="Pregunta a la IA"
+            placeholder="Escribe tu pregunta…"
+            style={{ flex: 1 }}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={loading}
+          />
           <button
             type="button"
             className="button button--primary"
-            onClick={() => void handleFormatLyrics()}
+            onClick={() => void handleSend()}
+            disabled={loading || !input.trim()}
           >
-            Estructurar estrofas
+            Enviar
           </button>
         </div>
+        <p className="hint" style={{ marginTop: 6, marginBottom: 0, fontSize: 11 }}>
+          Gratuito vía Pollinations.ai. Requiere conexión a internet.
+        </p>
       </div>
     </section>
   )

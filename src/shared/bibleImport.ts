@@ -207,10 +207,90 @@ export function parseZefaniaXml(xmlContent: string): BibleJsonBook[] {
   return books
 }
 
+/** Limpia el texto de un versículo .xmm: elimina etiquetas, marcadores de nota [n] y normaliza espacios. */
+function cleanXmmVerse(raw: string): string {
+  const withoutTags = raw.replace(/<[^>]+>/g, ' ')
+  const withoutFootnotes = withoutTags.replace(/\[\d+\]/g, '').replace(/\*/g, '')
+  const decoded = decodeEntities(withoutFootnotes)
+  return decoded
+    .split(/\r?\n/)
+    .map((line) => line.replace(/[ \t\u00a0]+/g, ' ').trim())
+    .filter((line) => line.length > 0)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * Parsea una Biblia en formato .xmm de Holyrics (<bible><b n="..."><c n="..."><v n="...">).
+ * Lanza un Error con mensaje en español si el archivo no es válido.
+ */
+export function parseXmmBible(xmmContent: string): BibleJsonBook[] {
+  const trimmed = xmmContent.replace(/^\uFEFF/, '').trim()
+  if (!trimmed) throw new Error('El archivo está vacío.')
+  if (!/<bible[\s>]/i.test(trimmed) && !/<b\s+n=/i.test(trimmed)) {
+    throw new Error('No es un archivo .xmm de Biblia válido.')
+  }
+
+  const bookRegex = /<b\s+n="([^"]*)">(.*?)<\/b>/gis
+  const chapterRegex = /<c\s+n="(\d+)">(.*?)<\/c>/gis
+  const verseRegex = /<v\s+n="(\d+)">(.*?)<\/v>/gis
+
+  const books: BibleJsonBook[] = []
+  let bookIdx = 0
+  for (const bookMatch of trimmed.matchAll(bookRegex)) {
+    bookIdx += 1
+    const rawName = bookMatch[1] ?? ""
+    const body = bookMatch[2] ?? ""
+    const meta = resolveBookMeta(String(bookIdx), rawName)
+
+    const chapters: string[][] = []
+    for (const chMatch of body.matchAll(chapterRegex)) {
+      const cnum = Number(chMatch[1])
+      const chapterIndex = Number.isInteger(cnum) && cnum > 0 ? cnum - 1 : chapters.length
+      while (chapters.length <= chapterIndex) chapters.push([])
+      const target = chapters[chapterIndex]
+      if (!target) continue
+      for (const vMatch of (chMatch[2] ?? "").matchAll(verseRegex)) {
+        const vnum = Number(vMatch[1])
+        const text = cleanXmmVerse(vMatch[2] ?? "")
+        if (!text) continue
+        const pos = Number.isInteger(vnum) && vnum > 0 ? vnum - 1 : target.length
+        while (target.length <= pos) target.push('')
+        target[pos] = text
+      }
+    }
+    while (chapters.length > 0 && (chapters[chapters.length - 1] ?? []).every((v) => !v || !v.trim())) {
+      chapters.pop()
+    }
+    if (chapters.length > 0 && chapters.some((ch) => ch.some((v) => v && v.trim()))) {
+      books.push({ abbrev: meta.abbrev, name: meta.name, chapters })
+    }
+  }
+
+  if (books.length === 0) {
+    throw new Error('El archivo .xmm no contiene versículos legibles.')
+  }
+  return books
+}
+
+/** Detecta el formato del contenido y lo parsea (Zefania XML o .xmm de Holyrics). */
+export function parseBibleContent(content: string, _fileName?: string): BibleJsonBook[] {
+  const trimmed = content.replace(/^\uFEFF/, '').trim()
+  if (!trimmed) throw new Error('El archivo está vacío.')
+  if (!trimmed.startsWith('<')) {
+    throw new Error('No es un archivo XML válido. Holyrics importa Biblias en formato XML (*.xml) o .xmm.')
+  }
+  if (/<bible[\s>]/i.test(trimmed) || /<b\s+n=/i.test(trimmed)) {
+    return parseXmmBible(content)
+  }
+  return parseZefaniaXml(content)
+}
+
 /** Sugiere un nombre de versión a partir del nombre del archivo importado. */
 export function suggestVersionName(fileName?: string): string {
   if (!fileName) return ''
-  const base = fileName.replace(/^.*[\\/]/, '').replace(/\.(xml|XML)$/, '').trim()
+  const base = fileName.replace(/^.*[\\/]/, '').replace(/\.(xml|XML|xmm|XMM|bib|BIB)$/, '').trim()
   if (!base) return ''
   return base
     .replace(/[_-]+/g, ' ')
