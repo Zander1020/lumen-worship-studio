@@ -1,10 +1,14 @@
 import { ipcMain, type BrowserWindow, type IpcMainInvokeEvent } from 'electron'
 import { IpcChannels, type AppInfo, type IpcChannel } from '../../shared/ipc'
+import type { PresentationDeck } from '../../shared/models'
 import { parseRawLyricsToStanzas } from '../../shared/slideHelpers'
 import {
   ValidationError,
   assertNoPayload,
+  parseBibleBooksRequest,
   parseBibleChapterRequest,
+  parseBibleSearchRequest,
+  parseBibleVersionImportRequest,
   parseHolyricsImportPayload,
   parseMediaBackgroundInput,
   parseNonEmptyId,
@@ -98,9 +102,9 @@ export function registerIpcHandlers(ctx: IpcContext): () => void {
   handle(IpcChannels.projectionLoadDeck, onlyMain, async (payload) => {
     const request = parseProjectionLoadDeckRequest(payload)
     const curTheme = ctx.store.get().projection.live.theme
-    if (curTheme.background && (curTheme.background.category === 'Culto' || curTheme.background.id.startsWith('culto-') || curTheme.background.id.startsWith('img-'))) {
-      const savedBg = ctx.workspace.getSettings().theme?.background
-      if (savedBg && savedBg.category !== 'Culto' && !savedBg.id.startsWith('culto-') && !savedBg.id.startsWith('img-')) {
+    if (curTheme.background.category === 'Culto' || curTheme.background.id.startsWith('culto-') || curTheme.background.id.startsWith('img-')) {
+      const savedBg = ctx.workspace.getSettings().theme.background
+      if (savedBg.category !== 'Culto' && !savedBg.id.startsWith('culto-') && !savedBg.id.startsWith('img-')) {
         ctx.store.updateTheme({ background: savedBg })
       } else {
         const defaultBg = ctx.workspace.listMedia().find((m) => m.category === 'Fondo' || m.id.startsWith('bg-'))
@@ -167,8 +171,8 @@ export function registerIpcHandlers(ctx: IpcContext): () => void {
   // --- Biblia ---
 
   handle(IpcChannels.bibleBooks, onlyMain, (payload) => {
-    assertNoPayload(payload)
-    return ctx.workspace.listBibleBooks()
+    const req = parseBibleBooksRequest(payload)
+    return ctx.workspace.listBibleBooks(req.version)
   })
 
   handle(IpcChannels.bibleGetChapter, onlyMain, (payload) => {
@@ -177,8 +181,23 @@ export function registerIpcHandlers(ctx: IpcContext): () => void {
   })
 
   handle(IpcChannels.bibleSearch, onlyMain, (payload) => {
-    const query = parseRawString(payload, 'query', 200)
-    return ctx.workspace.searchBible(query)
+    const req = parseBibleSearchRequest(payload)
+    return ctx.workspace.searchBible(req.query, req.version)
+  })
+
+  handle(IpcChannels.bibleVersions, onlyMain, (payload) => {
+    assertNoPayload(payload)
+    return ctx.workspace.listBibleVersions()
+  })
+
+  handle(IpcChannels.bibleImportVersion, onlyMain, (payload) => {
+    const req = parseBibleVersionImportRequest(payload)
+    return ctx.workspace.importBibleVersion(req)
+  })
+
+  handle(IpcChannels.bibleDeleteVersion, onlyMain, (payload) => {
+    const id = parseNonEmptyId(payload, 'versionId')
+    return ctx.workspace.deleteBibleVersion(id)
   })
 
   // --- Programación ---
@@ -251,7 +270,7 @@ export function registerIpcHandlers(ctx: IpcContext): () => void {
   })
 
   handle(IpcChannels.slidesSave, onlyMain, (payload) => {
-    return ctx.workspace.savePresentation(payload as unknown as import('../../shared/models').PresentationDeck)
+    return ctx.workspace.savePresentation(payload as PresentationDeck)
   })
 
   handle(IpcChannels.slidesDelete, onlyMain, (payload) => {

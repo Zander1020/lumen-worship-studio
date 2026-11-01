@@ -5,6 +5,8 @@ import type {
   AppStatus,
   BibleBookSummary,
   BibleChapterRequest,
+  BibleVersionImportRequest,
+  BibleVersionInfo,
   BibleVerse,
   HolyricsImportItem,
   MediaBackground,
@@ -48,9 +50,12 @@ export interface LumenApi {
   readonly importHolyricsCatalog: (items: HolyricsImportItem[]) => Promise<Song[]>
 
   /** Biblia */
-  readonly listBibleBooks: () => Promise<BibleBookSummary[]>
+  readonly listBibleBooks: (version?: string) => Promise<BibleBookSummary[]>
   readonly getBibleChapter: (request: BibleChapterRequest) => Promise<BibleVerse[]>
-  readonly searchBible: (query: string) => Promise<BibleVerse[]>
+  readonly searchBible: (query: string, version?: string) => Promise<BibleVerse[]>
+  readonly listBibleVersions?: () => Promise<BibleVersionInfo[]>
+  readonly importBibleVersion?: (request: BibleVersionImportRequest) => Promise<BibleVersionInfo[]>
+  readonly deleteBibleVersion?: (id: string) => Promise<BibleVersionInfo[]>
 
   /** Programación del culto */
   readonly listSchedule: () => Promise<ScheduleItem[]>
@@ -100,17 +105,20 @@ export interface LumenApi {
   readonly updateSettings: (patch: Partial<AppSettings>) => Promise<AppSettings>
 
   /** Auto-actualizador */
-  readonly getUpdateStatus?: () => Promise<{
-    status: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'
-    version?: string
-    releaseNotes?: string
-    progressPercent?: number
-    error?: string
-  }>
+  /** Estado del auto-actualizador compartido entre main, preload y renderer. */
+  readonly getUpdateStatus?: () => Promise<UpdateStatus>
   readonly checkForUpdates?: () => Promise<unknown>
   readonly downloadUpdate?: () => Promise<boolean>
   readonly installUpdate?: () => Promise<boolean>
-  readonly onUpdateStatusChanged?: (listener: (status: any) => void) => () => void
+  readonly onUpdateStatusChanged?: (listener: (status: UpdateStatus) => void) => () => void
+}
+
+export interface UpdateStatus {
+  status: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'
+  version?: string
+  releaseNotes?: string
+  progressPercent?: number
+  error?: string
 }
 
 /**
@@ -141,6 +149,9 @@ export const LUMEN_API_KEYS = [
   'listBibleBooks',
   'getBibleChapter',
   'searchBible',
+  'listBibleVersions',
+  'importBibleVersion',
+  'deleteBibleVersion',
   'listSchedule',
   'addScheduleItem',
   'removeScheduleItem',

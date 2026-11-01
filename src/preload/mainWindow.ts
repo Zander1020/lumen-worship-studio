@@ -5,7 +5,7 @@
  * `contextBridge`, funciones concretas. Nunca expone `ipcRenderer` ni módulos de Node.
  */
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
-import type { LumenApi } from '../shared/api'
+import type { LumenApi, UpdateStatus } from '../shared/api'
 import {
   IpcChannels,
   type AiSuggestionResult,
@@ -14,6 +14,8 @@ import {
   type AppStatus,
   type BibleBookSummary,
   type BibleChapterRequest,
+  type BibleVersionImportRequest,
+  type BibleVersionInfo,
   type BibleVerse,
   type HolyricsImportItem,
   type MediaBackground,
@@ -64,10 +66,17 @@ const api: LumenApi = {
   importHolyricsCatalog: (items: HolyricsImportItem[]) =>
     ipcRenderer.invoke(IpcChannels.songsImportHolyrics, items) as Promise<Song[]>,
 
-  listBibleBooks: () => ipcRenderer.invoke(IpcChannels.bibleBooks) as Promise<BibleBookSummary[]>,
+  listBibleBooks: (version?: string) =>
+    ipcRenderer.invoke(IpcChannels.bibleBooks, version ? { version } : undefined) as Promise<BibleBookSummary[]>,
   getBibleChapter: (request: BibleChapterRequest) =>
     ipcRenderer.invoke(IpcChannels.bibleGetChapter, request) as Promise<BibleVerse[]>,
-  searchBible: (query: string) => ipcRenderer.invoke(IpcChannels.bibleSearch, query) as Promise<BibleVerse[]>,
+  searchBible: (query: string, version?: string) =>
+    ipcRenderer.invoke(IpcChannels.bibleSearch, version ? { query, version } : query) as Promise<BibleVerse[]>,
+  listBibleVersions: () => ipcRenderer.invoke(IpcChannels.bibleVersions) as Promise<BibleVersionInfo[]>,
+  importBibleVersion: (request: BibleVersionImportRequest) =>
+    ipcRenderer.invoke(IpcChannels.bibleImportVersion, request) as Promise<BibleVersionInfo[]>,
+  deleteBibleVersion: (id: string) =>
+    ipcRenderer.invoke(IpcChannels.bibleDeleteVersion, id) as Promise<BibleVersionInfo[]>,
 
   listSchedule: () => ipcRenderer.invoke(IpcChannels.scheduleList) as Promise<ScheduleItem[]>,
   addScheduleItem: (input: ScheduleItemInput) =>
@@ -98,7 +107,7 @@ const api: LumenApi = {
   openExternalUrl: (url: string) => ipcRenderer.invoke(IpcChannels.appOpenExternal, url) as Promise<boolean>,
   getPathForFile: (file: File) => {
     try {
-      if (webUtils && typeof webUtils.getPathForFile === 'function') {
+      if (typeof webUtils.getPathForFile === 'function') {
         return webUtils.getPathForFile(file)
       }
     } catch {
@@ -128,8 +137,8 @@ const api: LumenApi = {
   checkForUpdates: () => ipcRenderer.invoke(IpcChannels.updaterCheck),
   downloadUpdate: () => ipcRenderer.invoke(IpcChannels.updaterDownload),
   installUpdate: () => ipcRenderer.invoke(IpcChannels.updaterInstall),
-  onUpdateStatusChanged: (listener: (status: any) => void) => {
-    const wrapped = (_event: IpcRendererEvent, status: any): void => {
+  onUpdateStatusChanged: (listener: (status: UpdateStatus) => void) => {
+    const wrapped = (_event: IpcRendererEvent, status: UpdateStatus): void => {
       listener(status)
     }
     ipcRenderer.on(IpcChannels.updaterStatusChanged, wrapped)

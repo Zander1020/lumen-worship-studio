@@ -30,7 +30,7 @@ export function TitleBar({ title = 'Lumen Studio' }: TitleBarProps) {
   const handleMaximize = async (): Promise<void> => {
     if (window.lumen?.maximizeWindow) {
       const next = await window.lumen.maximizeWindow()
-      setIsMaximized(Boolean(next))
+      setIsMaximized(next)
     }
   }
 
@@ -41,7 +41,7 @@ export function TitleBar({ title = 'Lumen Studio' }: TitleBarProps) {
   }
 
   return (
-    <header className="lumen-titlebar" onDoubleClick={handleMaximize}>
+    <header className="lumen-titlebar" onDoubleClick={() => void handleMaximize()}>
       <div
         style={{
           display: 'flex',
@@ -92,7 +92,7 @@ export function TitleBar({ title = 'Lumen Studio' }: TitleBarProps) {
           aria-label={isMaximized ? 'Restaurar ventana' : 'Maximizar ventana'}
           title={isMaximized ? 'Restaurar' : 'Maximizar'}
           className="lumen-win-btn lumen-win-btn--max"
-          onClick={handleMaximize}
+          onClick={() => void handleMaximize()}
         >
           {isMaximized ? (
             <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">

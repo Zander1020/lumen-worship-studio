@@ -17,7 +17,7 @@ export function UpdateNotifierModal(): React.JSX.Element | null {
 
     // Consultar estado inicial
     window.lumen.getUpdateStatus?.().then((res) => {
-      if (res && (res.status === 'available' || res.status === 'downloading' || res.status === 'downloaded')) {
+      if (res.status === 'available' || res.status === 'downloading' || res.status === 'downloaded') {
         setUpdateState(res)
       }
     }).catch(() => {})
@@ -46,7 +46,7 @@ export function UpdateNotifierModal(): React.JSX.Element | null {
   }
 
   const handleInstall = () => {
-    window.lumen?.installUpdate?.()
+    void window.lumen?.installUpdate?.()
   }
 
   return (

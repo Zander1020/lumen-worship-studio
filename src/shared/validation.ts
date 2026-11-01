@@ -2,6 +2,7 @@ import type {
   AppSettings,
   BackgroundKind,
   BibleChapterRequest,
+  BibleVersionImportRequest,
   HolyricsImportItem,
   MediaBackgroundInput,
   PresentationSlide,
@@ -396,6 +397,58 @@ export function parseBibleChapterRequest(input: unknown): BibleChapterRequest {
   }
   const version = typeof input['version'] === 'string' && input['version'].trim() ? input['version'].trim().slice(0, 80) : undefined
   return { book, chapter, ...(version ? { version } : {}) }
+}
+
+/** Acepta `undefined` (sin filtro) o `{ version? }` para `bible:books`. */
+export function parseBibleBooksRequest(input: unknown): { version?: string } {
+  if (input === undefined || input === null) return {}
+  if (!isPlainObject(input)) {
+    throw new ValidationError('La solicitud de libros bíblicos debe ser un objeto.')
+  }
+  const unknownKeys = Object.keys(input).filter((k) => k !== 'version')
+  if (unknownKeys.length > 0) {
+    throw new ValidationError(`Campos no permitidos: ${unknownKeys.join(', ')}`)
+  }
+  const version =
+    typeof input['version'] === 'string' && input['version'].trim()
+      ? input['version'].trim().slice(0, 80)
+      : undefined
+  return version ? { version } : {}
+}
+
+/**
+ * Búsqueda bíblica: acepta la carga clásica (string) o `{ query, version? }`
+ * para que la búsqueda respete la versión activa del usuario.
+ */
+export function parseBibleSearchRequest(input: unknown): { query: string; version?: string } {
+  if (typeof input === 'string') {
+    const query = parseRawString(input, 'query', 200)
+    return { query }
+  }
+  if (!isPlainObject(input)) {
+    throw new ValidationError('La búsqueda bíblica debe ser una cadena o un objeto.')
+  }
+  const query = parseRawString(input['query'], 'query', 200)
+  const version =
+    typeof input['version'] === 'string' && input['version'].trim()
+      ? input['version'].trim().slice(0, 80)
+      : undefined
+  return { query, ...(version ? { version } : {}) }
+}
+
+/** Importación de una versión propia en XML Zefania (formato Holyrics). */
+export function parseBibleVersionImportRequest(input: unknown): BibleVersionImportRequest {
+  if (!isPlainObject(input)) {
+    throw new ValidationError('La importación de versión debe ser un objeto.')
+  }
+  const name = requireNonEmptyString(input['name'], 'name', 80)
+  const content = parseRawString(input['content'], 'content', 50_000_000)
+  const request: BibleVersionImportRequest = { name, content }
+  const abbrev = optionalString(input['abbrev'], 'abbrev', 16)
+  if (abbrev) request.abbrev = abbrev
+  const fileName = optionalString(input['fileName'], 'fileName', 260)
+  if (fileName) request.fileName = fileName
+  return request
 }
 
 export function parseHolyricsImportPayload(input: unknown): HolyricsImportItem[] {

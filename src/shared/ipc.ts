@@ -3,6 +3,8 @@ import type {
   AppSettings,
   BackgroundKind,
   BibleBookSummary,
+  BibleVersionImportRequest,
+  BibleVersionInfo,
   BibleVerse,
   HolyricsImportItem,
   LiveProjectionState,
@@ -61,6 +63,9 @@ export const IpcChannels = {
   bibleBooks: 'bible:books',
   bibleGetChapter: 'bible:get-chapter',
   bibleSearch: 'bible:search',
+  bibleVersions: 'bible:versions',
+  bibleImportVersion: 'bible:import-version',
+  bibleDeleteVersion: 'bible:delete-version',
 
   /** Programación del culto */
   scheduleList: 'schedule:list',
@@ -153,6 +158,7 @@ export interface BibleChapterRequest {
 
 export interface BibleSearchRequest {
   query: string
+  version?: string
 }
 
 export interface ScheduleMoveRequest {
@@ -205,6 +211,8 @@ export type {
   AppSettings,
   BackgroundKind,
   BibleBookSummary,
+  BibleVersionImportRequest,
+  BibleVersionInfo,
   BibleVerse,
   HolyricsImportItem,
   LiveProjectionState,

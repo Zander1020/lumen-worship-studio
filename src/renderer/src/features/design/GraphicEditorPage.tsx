@@ -64,7 +64,7 @@ export function GraphicEditorPage({ app }: GraphicEditorPageProps) {
 
   // Modales
   const [exportModalOpen, setExportModalOpen] = useState(false)
-  const [exportFormat, setExportFormat] = useState<'png' | 'jpeg' | 'webp'>('png')
+  const [exportFormat, setExportFormat] = useState<'png' | 'jpeg' | 'webp' | 'lumen'>('png')
   const [exportQuality, setExportQuality] = useState<number>(0.95)
   const [exportingBusy, setExportingBusy] = useState(false)
   const [exportSuccessMsg, setExportSuccessMsg] = useState<string | null>(null)
@@ -594,7 +594,7 @@ export function GraphicEditorPage({ app }: GraphicEditorPageProps) {
     [project.layers.length, pushHistory]
   )
 
-  // Cargar proyecto desde archivo .lumen-design
+  // Cargar proyecto desde archivo .lumen (antes .lumen-design)
   const handleOpenProjectFile = (e: ChangeEvent<HTMLInputElement>): void => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -617,6 +617,7 @@ export function GraphicEditorPage({ app }: GraphicEditorPageProps) {
   // --- INTERACCIÓN Y ARRASTRE EN EL LIENZO ---
 
   const handlePointerDownLayer = (e: ReactMouseEvent, layer: GraphicLayer): void => {
+    if (e.button !== 0) return
     if (layer.locked) return
     e.stopPropagation()
     setSelectedLayerId(layer.id)
@@ -639,6 +640,7 @@ export function GraphicEditorPage({ app }: GraphicEditorPageProps) {
   }
 
   const handlePointerDownHandle = (e: ReactMouseEvent, handleType: string): void => {
+    if (e.button !== 0) return
     e.stopPropagation()
     if (!selectedLayer || selectedLayer.locked) return
 
@@ -773,11 +775,16 @@ export function GraphicEditorPage({ app }: GraphicEditorPageProps) {
   const handleExportDownload = async (): Promise<void> => {
     setExportingBusy(true)
     try {
-      const dataUrl = await exportProjectToDataUrl(project, exportFormat, exportQuality)
-      const ext = exportFormat === 'jpeg' ? 'jpg' : exportFormat
-      const filename = `${project.name.toLowerCase().replace(/[^a-z0-9_-]/g, '_') || 'diseno'}.${ext}`
-      downloadDataUrl(dataUrl, filename)
-      setExportSuccessMsg('¡Diseño exportado con éxito en su resolución nativa!')
+      if (exportFormat === 'lumen') {
+        exportProjectFile(project)
+        setExportSuccessMsg('¡Diseño guardado como archivo .lumen editable!')
+      } else {
+        const dataUrl = await exportProjectToDataUrl(project, exportFormat, exportQuality)
+        const ext = exportFormat === 'jpeg' ? 'jpg' : exportFormat
+        const filename = `${project.name.toLowerCase().replace(/[^a-z0-9_-]/g, '_') || 'diseno'}.${ext}`
+        downloadDataUrl(dataUrl, filename)
+        setExportSuccessMsg('¡Diseño exportado con éxito en su resolución nativa!')
+      }
       setTimeout(() => setExportSuccessMsg(null), 3000)
     } catch (err) {
       alert('Error al exportar: ' + String(err))
@@ -888,14 +895,14 @@ export function GraphicEditorPage({ app }: GraphicEditorPageProps) {
           <input
             ref={projectFileInputRef}
             type="file"
-            accept=".lumen-design,.json"
+            accept=".lumen,.lumen-design,.json"
             style={{ display: 'none' }}
             onChange={handleOpenProjectFile}
           />
           <button
             type="button"
             className="ge-topbar__btn"
-            title="Abrir proyecto editable (.lumen-design)"
+            title="Abrir proyecto editable (.lumen)"
             onClick={() => projectFileInputRef.current?.click()}
           >
             📂 Abrir
@@ -1190,7 +1197,9 @@ export function GraphicEditorPage({ app }: GraphicEditorPageProps) {
         <main
           ref={canvasAreaRef}
           className="ge-canvas-viewport"
-          onClick={() => {
+          onClick={(e) => {
+            const target = e.target as HTMLElement | null
+            if (target?.closest('.ge-canvas-stage') || target?.closest('.ge-zoom-controls')) return
             setSelectedLayerId(null)
             setEditingTextId(null)
           }}
@@ -1259,6 +1268,7 @@ export function GraphicEditorPage({ app }: GraphicEditorPageProps) {
                   setEditingTextId(null)
                 }
               }}
+              onContextMenu={(e) => e.preventDefault()}
             >
               {project.layers.map((layer) => {
                 if (!layer.visible) return null
@@ -2093,15 +2103,24 @@ export function GraphicEditorPage({ app }: GraphicEditorPageProps) {
             </div>
 
             <div style={{ fontSize: 13, color: '#cbd5e1' }}>
-              Resolución real de salida:{' '}
-              <strong style={{ color: '#f59e0b' }}>
-                {project.width} × {project.height} px
-              </strong>{' '}
-              (Calidad 100% sin controles ni guías)
+              {exportFormat === 'lumen' ? (
+                <>
+                  Archivo editable <strong style={{ color: '#f59e0b' }}>.lumen</strong> (JSON) — puedes
+                  reabrirlo en el editor más adelante.
+                </>
+              ) : (
+                <>
+                  Resolución real de salida:{' '}
+                  <strong style={{ color: '#f59e0b' }}>
+                    {project.width} × {project.height} px
+                  </strong>{' '}
+                  (Calidad 100% sin controles ni guías)
+                </>
+              )}
             </div>
 
             <div className="ge-form-group">
-              <label className="ge-form-label">Formato de Imagen</label>
+              <label className="ge-form-label">Formato de salida</label>
               <div className="ge-btn-group">
                 <button
                   type="button"
@@ -2124,10 +2143,18 @@ export function GraphicEditorPage({ app }: GraphicEditorPageProps) {
                 >
                   WebP (Ligero)
                 </button>
+                <button
+                  type="button"
+                  className={`ge-btn-group__item${exportFormat === 'lumen' ? ' ge-btn-group__item--active' : ''}`}
+                  onClick={() => setExportFormat('lumen')}
+                  title="Proyecto editable para reabrir en el editor"
+                >
+                  LUMEN (Editable)
+                </button>
               </div>
             </div>
 
-            {exportFormat !== 'png' && (
+            {exportFormat !== 'png' && exportFormat !== 'lumen' && (
               <div className="ge-form-group">
                 <label className="ge-form-label">Calidad de compresión ({Math.round(exportQuality * 100)}%)</label>
                 <input
@@ -2155,7 +2182,7 @@ export function GraphicEditorPage({ app }: GraphicEditorPageProps) {
                 disabled={exportingBusy}
                 onClick={() => void handleExportDownload()}
               >
-                📥 Descargar Archivo ({exportFormat.toUpperCase()})
+                📥 Descargar Archivo ({exportFormat === 'lumen' ? 'LUMEN' : exportFormat.toUpperCase()})
               </button>
 
               <button

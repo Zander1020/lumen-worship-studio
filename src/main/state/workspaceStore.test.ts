@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { WorkspaceStore } from './workspaceStore'
 
@@ -85,7 +86,6 @@ describe('WorkspaceStore', () => {
   it('sincroniza presentaciones con la carpeta de diapositivas y purga elementos huérfanos al recargar', async () => {
     const { mkdtempSync, writeFileSync, rmSync } = await import('node:fs')
     const { tmpdir } = await import('node:os')
-    const { join } = await import('node:path')
 
     const tempDir = mkdtempSync(join(tmpdir(), 'lumen-test-'))
     const workspaceJson = join(tempDir, 'workspace.json')

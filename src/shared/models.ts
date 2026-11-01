@@ -68,6 +68,19 @@ export interface BibleBookSummary {
   chapters: number[]
 }
 
+export interface BibleVersionInfo {
+  id: string
+  name: string
+  builtIn: boolean
+}
+
+export interface BibleVersionImportRequest {
+  name: string
+  abbrev?: string
+  content: string
+  fileName?: string
+}
+
 export type BackgroundKind = 'gradient' | 'solid' | 'image' | 'video'
 
 export interface MediaBackground {

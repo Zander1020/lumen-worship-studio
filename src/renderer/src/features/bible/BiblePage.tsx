@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState, type KeyboardEvent } from 'react'
-import type { BibleVerse } from '../../../../shared/ipc'
+import { useEffect, useMemo, useState, type ChangeEvent, type KeyboardEvent } from 'react'
+import type { BibleVersionInfo, BibleVerse } from '../../../../shared/ipc'
+import { suggestVersionName } from '../../../../shared/bibleImport'
 import { parseBibleCitation, resolveBibleCitationBook, versesToSlides } from '../../../../shared/slideHelpers'
+import { ConfirmDeleteModal } from '../../components/ConfirmDeleteModal'
 import type { UseAppStatus } from '../../hooks/useAppStatus'
 
 export interface BiblePageProps {
@@ -12,6 +14,24 @@ type TestamentFilter = 'ALL' | 'AT' | 'NT'
 const PENTATEUCH = new Set(['Génesis', 'Éxodo', 'Levítico', 'Números', 'Deuteronomio'])
 const POETIC = new Set(['Job', 'Salmos', 'Proverbios', 'Eclesiastés', 'Cantares'])
 const GOSPELS = new Set(['Mateo', 'Marcos', 'Lucas', 'Juan', 'Hechos'])
+
+const BUILTIN_VERSION_OPTIONS: BibleVersionInfo[] = [
+  { id: 'rvr1960', name: 'RVR 1960', builtIn: true },
+  { id: 'rvr1909', name: 'RVR 1909', builtIn: true },
+  { id: 'nvi', name: 'NVI', builtIn: true },
+  { id: 'dhh', name: 'DHH', builtIn: true },
+  { id: 'lbla', name: 'LBLA', builtIn: true },
+  { id: 'tla', name: 'TLA', builtIn: true }
+]
+
+const BUILTIN_FULL_NAMES: Record<string, string> = {
+  rvr1960: 'Reina-Valera 1960',
+  rvr1909: 'Reina-Valera 1909',
+  nvi: 'Nueva Versión Internacional',
+  dhh: 'Dios Habla Hoy',
+  lbla: 'La Biblia de las Américas',
+  tla: 'Traducción en Lenguaje Actual'
+}
 
 function getBookDivisionColor(bookName: string, testament?: 'AT' | 'NT'): string {
   if (PENTATEUCH.has(bookName)) return '#d97706'
@@ -37,12 +57,35 @@ export function BiblePage({ app }: BiblePageProps) {
   const [verses, setVerses] = useState<BibleVerse[]>([])
   const [activeVerseNum, setActiveVerseNum] = useState<number | null>(null)
   const splitLongVerses = false
-  const parallelMode = false
+  const parallelMode = false as boolean
   const [highlightWord, setHighlightWord] = useState('')
-  const [bibleVersion, setBibleVersion] = useState('Reina-Valera 1960')
+  const [bibleVersion, setBibleVersion] = useState('rvr1960')
   const [recentPassages, setRecentPassages] = useState<string[]>([])
 
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importName, setImportName] = useState('')
+  const [importAbbrev, setImportAbbrev] = useState('')
+  const [importContent, setImportContent] = useState('')
+  const [importFileName, setImportFileName] = useState('')
+  const [importAttempted, setImportAttempted] = useState(false)
+  const [versionToDelete, setVersionToDelete] = useState<BibleVersionInfo | null>(null)
+
   const [chapterVerses, setChapterVerses] = useState<BibleVerse[]>([])
+
+  const builtinVersions = useMemo(() => {
+    const fromApi = app.bibleVersions.filter((v) => v.builtIn)
+    return fromApi.length > 0 ? fromApi : BUILTIN_VERSION_OPTIONS
+  }, [app.bibleVersions])
+  const importedVersions = useMemo(
+    () => app.bibleVersions.filter((v) => !v.builtIn),
+    [app.bibleVersions]
+  )
+  const activeVersionInfo = useMemo(
+    () => app.bibleVersions.find((v) => v.id === bibleVersion),
+    [app.bibleVersions, bibleVersion]
+  )
+  const activeVersionLabel =
+    activeVersionInfo?.name ?? BUILTIN_FULL_NAMES[bibleVersion] ?? 'Reina-Valera 1960'
 
   const filteredBooks = useMemo(() => {
     const q = bookSearch.trim().toLowerCase()
@@ -78,10 +121,23 @@ export function BiblePage({ app }: BiblePageProps) {
 
   const handleVersionChange = async (newVer: string): Promise<void> => {
     setBibleVersion(newVer)
+    setImportAttempted(false)
+    // Las versiones importadas traen su propio catálogo de libros: recargarlo
+    const books = await app.loadBibleBooks(newVer)
+    const targetBook = books.find((b) => b.book === selectedBook) ?? books[0]
+    if (targetBook && targetBook.book !== selectedBook) {
+      setSelectedBook(targetBook.book)
+      setSelectedChapter(targetBook.chapters[0] ?? 1)
+      return // el efecto superior recarga el capítulo con la nueva versión
+    }
+    const versionLabel =
+      app.bibleVersions.find((v) => v.id === newVer)?.name ??
+      BUILTIN_FULL_NAMES[newVer] ??
+      'Reina-Valera 1960'
     const chapRes = await app.getBibleChapter({ book: selectedBook, chapter: selectedChapter, version: newVer })
     setChapterVerses(chapRes)
     if (query.trim().length > 0) {
-      const results = await app.searchBible(query.trim())
+      const results = await app.searchBible(query.trim(), newVer)
       setVerses(results)
       return
     }
@@ -90,7 +146,7 @@ export function BiblePage({ app }: BiblePageProps) {
       const currentIdx = live.currentIndex >= 0 && live.currentIndex < chapRes.length ? live.currentIndex : 0
       void app.loadProjectionDeck({
         deckTitle: currentDeckTitle,
-        slides: versesToSlides(chapRes, splitLongVerses, newVer),
+        slides: versesToSlides(chapRes, splitLongVerses, versionLabel),
         startIndex: currentIdx
       })
     }
@@ -100,7 +156,7 @@ export function BiblePage({ app }: BiblePageProps) {
     setQuery(text)
     if (!text.trim()) return
     const normalized = normalizePredictiveCitation(text)
-    const results = await app.searchBible(normalized)
+    const results = await app.searchBible(normalized, bibleVersion)
     setVerses(results)
   }
 
@@ -134,7 +190,7 @@ export function BiblePage({ app }: BiblePageProps) {
         return
       }
     }
-    const results = await app.searchBible(text)
+    const results = await app.searchBible(text, bibleVersion)
     setVerses(results)
     if (results.length > 0) {
       const first = results[0]
@@ -156,7 +212,7 @@ export function BiblePage({ app }: BiblePageProps) {
   }
 
   const buildBibleSlides = (list: readonly BibleVerse[]) => {
-    const baseSlides = versesToSlides(list, splitLongVerses, bibleVersion)
+    const baseSlides = versesToSlides(list, splitLongVerses, activeVersionLabel)
     if (!parallelMode) return baseSlides
     return baseSlides.map((sl, idx) => {
       const nextV = list[idx + 1]
@@ -237,6 +293,59 @@ export function BiblePage({ app }: BiblePageProps) {
     void app.updateProjectionTheme({ highlightWord: word.trim() })
   }
 
+  const closeImportModal = (): void => {
+    setShowImportModal(false)
+    setImportName('')
+    setImportAbbrev('')
+    setImportContent('')
+    setImportFileName('')
+    setImportAttempted(false)
+  }
+
+  const handleImportFile = (e: ChangeEvent<HTMLInputElement>): void => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImportFileName(file.name)
+    setImportAttempted(false)
+    const reader = new FileReader()
+    reader.onload = () => {
+      setImportContent(typeof reader.result === 'string' ? reader.result : '')
+      setImportName((prev) => (prev.trim() ? prev : suggestVersionName(file.name)))
+    }
+    reader.onerror = () => {
+      setImportContent('')
+      setImportAttempted(true)
+    }
+    reader.readAsText(file)
+  }
+
+  const submitImportVersion = async (): Promise<void> => {
+    if (!importName.trim() || !importContent) {
+      setImportAttempted(true)
+      return
+    }
+    const res = await app.importBibleVersion({
+      name: importName.trim(),
+      content: importContent,
+      ...(importAbbrev.trim() ? { abbrev: importAbbrev.trim() } : {}),
+      ...(importFileName ? { fileName: importFileName } : {})
+    })
+    if (res) closeImportModal()
+    else setImportAttempted(true)
+  }
+
+  const confirmDeleteVersion = async (): Promise<void> => {
+    const target = versionToDelete
+    if (!target) return
+    const res = await app.deleteBibleVersion(target.id)
+    if (!res) return
+    setVersionToDelete(null)
+    if (bibleVersion === target.id) {
+      setBibleVersion('rvr1960')
+      await app.loadBibleBooks('rvr1960')
+    }
+  }
+
   return (
     <section className="page hly-page" aria-labelledby="page-title">
       {/* Barra superior compacta de 1 sola fila para dejar toda la altura a los versículos */}
@@ -258,16 +367,46 @@ export function BiblePage({ app }: BiblePageProps) {
             aria-label="Versión bíblica"
             value={bibleVersion}
             onChange={(e) => void handleVersionChange(e.target.value)}
-            style={{ width: 140, fontWeight: 700 }}
+            style={{ width: 150, fontWeight: 700 }}
             title="Seleccionar versión bíblica para la proyección"
           >
-            <option value="Reina-Valera 1960">RVR 1960</option>
-            <option value="Reina-Valera 1909">RVR 1909</option>
-            <option value="Nueva Versión Internacional">NVI</option>
-            <option value="Dios Habla Hoy">DHH</option>
-            <option value="La Biblia de las Américas">LBLA</option>
-            <option value="Traducción en Lenguaje Actual">TLA</option>
+            <optgroup label="Clásicas">
+              {builtinVersions.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {BUILTIN_VERSION_OPTIONS.find((o) => o.id === v.id)?.name ?? v.name}
+                </option>
+              ))}
+            </optgroup>
+            {importedVersions.length > 0 && (
+              <optgroup label="Mis versiones">
+                {importedVersions.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </select>
+          <button
+            type="button"
+            className="hly-mini-btn"
+            aria-label="Importar versión bíblica"
+            title="Importar versión propia (XML Zefania, el formato de Holyrics)"
+            onClick={() => setShowImportModal(true)}
+          >
+            ➕
+          </button>
+          {activeVersionInfo && !activeVersionInfo.builtIn && (
+            <button
+              type="button"
+              className="hly-mini-btn"
+              aria-label="Eliminar versión bíblica"
+              title={`Eliminar la versión «${activeVersionInfo.name}»`}
+              onClick={() => setVersionToDelete(activeVersionInfo)}
+            >
+              🗑
+            </button>
+          )}
           <input
             type="text"
             placeholder="Resaltar palabra..."
@@ -390,8 +529,8 @@ export function BiblePage({ app }: BiblePageProps) {
             <span className="hly-panel__title">
               📖{' '}
               {query.trim()
-                ? `RESULTADOS PARA «${query.toUpperCase()}» (${verses.length}) · ${bibleVersion}`
-                : `${selectedBook.toUpperCase()} ${selectedChapter} (${verses.length} VERSÍCULOS) · ${bibleVersion}`}
+                ? `RESULTADOS PARA «${query.toUpperCase()}» (${verses.length}) · ${activeVersionLabel}`
+                : `${selectedBook.toUpperCase()} ${selectedChapter} (${verses.length} VERSÍCULOS) · ${activeVersionLabel}`}
             </span>
           </div>
 
@@ -423,8 +562,8 @@ export function BiblePage({ app }: BiblePageProps) {
                     key={`${v.book}-${v.chapter}-${v.verse}`}
                     className={`verse-row${isProjected ? ' verse-row--active' : ''}`}
                     title="1 clic: Cargar en monitor · Doble clic: Activar proyección y enviar versículo"
-                    onClick={() => projectFromVerse(idx, false)}
-                    onDoubleClick={() => projectFromVerse(idx, true)}
+                    onClick={() => void projectFromVerse(idx, false)}
+                    onDoubleClick={() => void projectFromVerse(idx, true)}
                   >
                     <div className="verse-row__num">{v.verse}</div>
                     <div className="verse-row__content">
@@ -442,6 +581,208 @@ export function BiblePage({ app }: BiblePageProps) {
           )}
         </div>
       </div>
+
+      {showImportModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.72)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16
+          }}
+          onClick={closeImportModal}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bible-import-title"
+            style={{
+              width: '100%',
+              maxWidth: 470,
+              backgroundColor: '#181b24',
+              border: '1px solid rgba(59, 130, 246, 0.4)',
+              borderRadius: 12,
+              boxShadow: '0 20px 45px rgba(0, 0, 0, 0.8)',
+              padding: '22px 24px',
+              color: '#f3f4f6',
+              fontFamily: 'system-ui, -apple-system, sans-serif'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="bible-import-title" style={{ margin: '0 0 6px 0', fontSize: 16, fontWeight: 700, color: '#fff' }}>
+              Importar versión bíblica
+            </h3>
+            <p style={{ margin: '0 0 16px 0', fontSize: 13, lineHeight: 1.5, color: '#9ca3af' }}>
+              Formato XML Zefania (el mismo que usa Holyrics). El archivo se guarda en tu carpeta de datos y
+              aparecerá en el selector como versión propia.
+            </p>
+
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#d1d5db', marginBottom: 4 }}>
+              Nombre de la versión
+              <input
+                type="text"
+                value={importName}
+                onChange={(e) => setImportName(e.target.value)}
+                placeholder="Ej. Reina-Valera 1960"
+                maxLength={80}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  marginTop: 4,
+                  padding: '8px 10px',
+                  fontSize: 14,
+                  borderRadius: 6,
+                  border: '1px solid #374151',
+                  backgroundColor: '#0f1117',
+                  color: '#f3f4f6',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </label>
+
+            <label
+              style={{
+                display: 'block',
+                fontSize: 13,
+                fontWeight: 600,
+                color: '#d1d5db',
+                marginBottom: 4,
+                marginTop: 12
+              }}
+            >
+              Abrid (opcional)
+              <input
+                type="text"
+                value={importAbbrev}
+                onChange={(e) => setImportAbbrev(e.target.value)}
+                placeholder="Ej. RVR60"
+                maxLength={16}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  marginTop: 4,
+                  padding: '8px 10px',
+                  fontSize: 14,
+                  borderRadius: 6,
+                  border: '1px solid #374151',
+                  backgroundColor: '#0f1117',
+                  color: '#f3f4f6',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </label>
+
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#d1d5db', marginTop: 12 }}>
+              Archivo XML
+              <input
+                type="file"
+                accept=".xml,.txt,text/xml"
+                onChange={handleImportFile}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  marginTop: 6,
+                  fontSize: 13,
+                  color: '#9ca3af'
+                }}
+              />
+            </label>
+            {importFileName && (
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
+                Archivo seleccionado: {importFileName}
+                {importContent ? ` (${Math.max(1, Math.round(importContent.length / 1024))} KB)` : ''}
+              </div>
+            )}
+
+            {importAttempted && (!importName.trim() || !importContent) && (
+              <div
+                role="alert"
+                style={{
+                  marginTop: 12,
+                  padding: '8px 10px',
+                  fontSize: 13,
+                  borderRadius: 6,
+                  backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                  color: '#fca5a5'
+                }}
+              >
+                Selecciona un archivo XML válido y escribe un nombre para la versión.
+              </div>
+            )}
+            {importAttempted && importName.trim() && importContent && app.error && (
+              <div
+                role="alert"
+                style={{
+                  marginTop: 12,
+                  padding: '8px 10px',
+                  fontSize: 13,
+                  borderRadius: 6,
+                  backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                  color: '#fca5a5',
+                  wordBreak: 'break-word'
+                }}
+              >
+                {app.error}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 22 }}>
+              <button
+                type="button"
+                className="hly-mini-btn"
+                style={{
+                  padding: '7px 16px',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  background: '#242936',
+                  border: '1px solid #374151',
+                  color: '#d1d5db',
+                  borderRadius: 6,
+                  cursor: 'pointer'
+                }}
+                onClick={closeImportModal}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="hly-mini-btn"
+                disabled={app.busy}
+                style={{
+                  padding: '7px 18px',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  background: app.busy ? '#374151' : '#2563eb',
+                  border: `1px solid ${app.busy ? '#4b5563' : '#3b82f6'}`,
+                  color: '#ffffff',
+                  borderRadius: 6,
+                  cursor: app.busy ? 'wait' : 'pointer',
+                  boxShadow: app.busy ? 'none' : '0 2px 8px rgba(37, 99, 235, 0.35)'
+                }}
+                onClick={() => void submitImportVersion()}
+              >
+                {app.busy ? 'Importando…' : 'Importar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ConfirmDeleteModal
+        isOpen={versionToDelete !== null}
+        title="¿Eliminar esta versión bíblica?"
+        itemName={versionToDelete?.name ?? ''}
+        itemType="archivo de versión"
+        onConfirm={() => void confirmDeleteVersion()}
+        onCancel={() => setVersionToDelete(null)}
+      />
     </section>
   )
 }

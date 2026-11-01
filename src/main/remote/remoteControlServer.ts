@@ -3,7 +3,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { networkInterfaces } from 'node:os'
 import { extname } from 'node:path'
 import type { ProjectionDisplayMode, RemoteServerInfo } from '../../shared/ipc'
-import type { BibleVerse, ProjectionTheme } from '../../shared/models'
+import type { BibleVerse } from '../../shared/models'
 import { createAnnouncementSlide, songToSlides, versesToSlides } from '../../shared/slideHelpers'
 import type { StatusStore } from '../state/statusStore'
 import type { WorkspaceStore } from '../state/workspaceStore'
@@ -189,9 +189,9 @@ export class RemoteControlServer {
   private ensureActiveBackground(): void {
     const curTheme = this.statusStore.get().projection.live.theme
     // Solo corregir si el fondo actual era un medio del culto (categoría 'Culto' o id 'culto-')
-    if (curTheme.background && (curTheme.background.category === 'Culto' || curTheme.background.id.startsWith('culto-'))) {
-      const savedBg = this.workspace.getSettings().theme?.background
-      if (savedBg && savedBg.category !== 'Culto' && !savedBg.id.startsWith('culto-')) {
+    if (curTheme.background.category === 'Culto' || curTheme.background.id.startsWith('culto-')) {
+      const savedBg = this.workspace.getSettings().theme.background
+      if (savedBg.category !== 'Culto' && !savedBg.id.startsWith('culto-')) {
         this.statusStore.updateTheme({ background: savedBg })
       } else {
         const defaultBg = this.workspace.listMedia().find((m) => m.category === 'Fondo' || m.id.startsWith('bg-'))
@@ -560,7 +560,7 @@ export class RemoteControlServer {
               })
             }
           } else if (action === 'adjust-font-scale' && typeof parsed['delta'] === 'number') {
-            const curScale = this.statusStore.get().projection.live.theme.fontScale ?? 100
+            const curScale = this.statusStore.get().projection.live.theme.fontScale
             const nextScale = Math.max(50, Math.min(200, curScale + parsed['delta']))
             this.statusStore.updateTheme({ fontScale: nextScale })
           } else if (action === 'set-ticker' && typeof parsed['text'] === 'string') {
@@ -575,7 +575,7 @@ export class RemoteControlServer {
               tickerText: ''
             })
           } else if (action === 'update-theme' && typeof parsed['theme'] === 'object' && parsed['theme']) {
-            this.statusStore.updateTheme(parsed['theme'] as Partial<ProjectionTheme>)
+            this.statusStore.updateTheme(parsed['theme'])
           } else if (action === 'load-schedule' && typeof parsed['id'] === 'string') {
             const item = this.workspace.listSchedule().find((s) => s.id === parsed['id'])
             if (item) {

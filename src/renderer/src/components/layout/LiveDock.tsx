@@ -330,10 +330,9 @@ export function LiveDock({ app }: LiveDockProps) {
           {(() => {
             const currentSlide = live ? live.slides[live.currentIndex] : undefined
             const isSlideImage = Boolean(currentSlide?.imageUrl && !isVideoUrl(currentSlide.imageUrl))
-            const isSlideVideo = Boolean(
+            const isSlideVideo =
               (currentSlide?.imageUrl && isVideoUrl(currentSlide.imageUrl)) ||
-                live?.theme.background.kind === 'video'
-            )
+              live?.theme.background.kind === 'video'
             const isFill = live?.theme.mediaFit === 'fill' || live?.theme.mediaFit === 'cover'
 
             if (!isSlideImage && !isSlideVideo) return null
@@ -381,7 +380,7 @@ export function LiveDock({ app }: LiveDockProps) {
                       }}
                       onPointerUp={(e) => {
                         setIsDraggingVideo(false)
-                        const val = Number((e.currentTarget as HTMLInputElement).value)
+                        const val = Number((e.currentTarget).value)
                         setVideoTime(val)
                         void app.updateProjectionTheme({
                           videoSeekSeconds: val,
@@ -390,7 +389,7 @@ export function LiveDock({ app }: LiveDockProps) {
                       }}
                       onKeyUp={(e) => {
                         if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Home' || e.key === 'End') {
-                          const val = Number((e.currentTarget as HTMLInputElement).value)
+                          const val = Number((e.currentTarget).value)
                           setVideoTime(val)
                           void app.updateProjectionTheme({
                             videoSeekSeconds: val,
@@ -596,10 +595,12 @@ export function LiveDock({ app }: LiveDockProps) {
                 type="button"
                 className="hly-mini-btn"
                 title="Recargar fondos locales desde el disco"
-                onClick={async () => {
+                onClick={() => {
                   setIsReloading(true)
-                  await app.reloadBackgrounds?.()
-                  setTimeout(() => setIsReloading(false), 500)
+                  void (async (): Promise<void> => {
+                    await app.reloadBackgrounds?.()
+                    setTimeout(() => setIsReloading(false), 500)
+                  })()
                 }}
               >
                 <span style={{ display: 'inline-block', transform: isReloading ? 'rotate(360deg)' : 'none', transition: 'transform 0.5s ease' }}>🔄</span>

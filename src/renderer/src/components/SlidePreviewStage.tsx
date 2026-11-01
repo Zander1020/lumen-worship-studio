@@ -2,6 +2,7 @@ import { type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useMemo
 import lumenLogo from '../assets/lumen.png'
 import type { LiveProjectionState } from '../../../shared/ipc'
 import { isVideoUrl, resolveMediaVideoUrl } from '../../../shared/slideHelpers'
+import { computeHolyricsOptimalFontSize } from './holyricsFontFit'
 
 const BARS = ['#c0c0c0', '#c0c000', '#00c0c0', '#00c000', '#c000c0', '#c00000', '#0000c0']
 
@@ -428,91 +429,6 @@ export interface SlidePreviewStageProps {
   onVideoProgress?: ((currentTime: number, duration: number) => void) | undefined
 }
 
-export interface HolyricsFontFitOptions {
-  lines: readonly string[]
-  isUppercase: boolean
-  hasHeader: boolean
-  userScalePct?: number
-}
-
-export interface HolyricsFontFitResult {
-  vw: number
-  compactPx: number
-  maxLineVh: number
-  estimatedLines: number
-}
-
-/**
- * Motor de Auto-Ajuste de Texto Holyrics:
- * Maximiza de forma inteligente el tamaño de fuente para llenar el área útil
- * de la pantalla de proyección, logrando que el texto sea lo más grande y nítido
- * posible (legible desde el fondo de la iglesia), pero adaptando la escala
- * dinámicamente según la longitud del versículo o estrofa para que jamás se corte.
- */
-export function computeHolyricsOptimalFontSize(options: HolyricsFontFitOptions): HolyricsFontFitResult {
-  const { lines, isUppercase, hasHeader, userScalePct = 100 } = options
-  const userMultiplier = Math.max(0.6, Math.min(2.0, userScalePct / 100))
-
-  const fullText = lines.join(' ').trim()
-  const totalChars = fullText.length
-  const rawLineCount = lines.length
-
-  if (totalChars === 0) {
-    return { vw: 5.5, compactPx: 16, maxLineVh: 25, estimatedLines: 1 }
-  }
-
-  // En mayúsculas las palabras ocupan ~16% más de ancho promedio
-  const charRatio = isUppercase ? 0.58 : 0.50
-
-  // Dimensiones útiles de proyección en pantalla panorámica 16:9:
-  // Ancho útil: 92vw (dejando 4% de margen a cada lado)
-  // Alto útil: 78vh si tiene cabecera de cita bíblica / reloj, 84vh si no tiene cabecera
-  // En 16:9, 1vh = 0.5625vw (alto total = 56.25vw)
-  const availVw = 92
-  const availVh = hasHeader ? 78 : 84
-  const availVhInVw = availVh * 0.5625
-
-  // Evaluamos de 1 a 8 renglones de ajuste (k) para encontrar el mayor tamaño de fuente posible
-  let bestVw = 2.4
-  const minK = Math.max(1, rawLineCount)
-  const maxK = Math.max(minK, 8)
-
-  for (let k = minK; k <= maxK; k++) {
-    const maxLineChars = rawLineCount > 1
-      ? Math.max(...lines.map((l) => l.trim().length), Math.ceil(totalChars / k))
-      : Math.ceil(totalChars / k)
-
-    const maxVwHorizontal = availVw / (Math.max(1, maxLineChars) * charRatio)
-    const maxVwVertical = availVhInVw / (k * 1.20)
-    const safeVw = Math.min(maxVwHorizontal, maxVwVertical)
-
-    if (safeVw > bestVw) {
-      bestVw = safeVw
-    }
-  }
-
-  // Techo y piso estéticos para proyección:
-  // Entre 2.4vw (textos ultra largos de 350+ caracteres) y 7.8vw (versos cortos / estrofas de alabanza)
-  const clampedBaseVw = Math.max(2.4, Math.min(7.8, bestVw))
-  const finalVw = clampedBaseVw * userMultiplier
-
-  const estimatedLines = Math.max(
-    rawLineCount,
-    Math.ceil(totalChars / Math.max(12, availVw / (finalVw * charRatio)))
-  )
-  const maxLineVh = Math.max(4.0, availVh / (Math.max(1, estimatedLines) * 1.18))
-
-  // En monitor compacto (vista previa en el LiveDock de cabina):
-  const compactPx = Math.max(9, Math.min(24, Math.round((finalVw / 5.5) * 16)))
-
-  return {
-    vw: finalVw,
-    compactPx,
-    maxLineVh,
-    estimatedLines
-  }
-}
-
 function renderHighlightedLine(text: string, highlightWord?: string): ReactNode {
   const kw = (highlightWord ?? '').trim()
   if (!kw) return text
@@ -588,10 +504,10 @@ export function SlidePreviewStage({
     currentSlide?.imageUrl &&
       (currentSlide.mediaKind === 'video' ||
         isVideoUrl(currentSlide.imageUrl) ||
-        currentSlide.label?.toLowerCase().includes('video') ||
-        currentSlide.label?.toLowerCase().includes('vídeo') ||
-        currentSlide.sourceTitle?.toLowerCase().includes('video') ||
-        currentSlide.sourceTitle?.toLowerCase().includes('vídeo'))
+        currentSlide.label.toLowerCase().includes('video') ||
+        currentSlide.label.toLowerCase().includes('vídeo') ||
+        currentSlide.sourceTitle.toLowerCase().includes('video') ||
+        currentSlide.sourceTitle.toLowerCase().includes('vídeo'))
   )
   const slideVideoSrc = isSlideVideo && currentSlide?.imageUrl ? resolveMediaVideoUrl(currentSlide.imageUrl) : ''
 
@@ -607,12 +523,9 @@ export function SlidePreviewStage({
     if (theme.videoPlaying === false) {
       vid.pause()
     } else {
-      const playPromise = vid.play()
-      if (playPromise !== undefined) {
-        playPromise.catch((err) => {
-          console.warn('[SlideVideo] Playback waiting or interrupted:', err)
-        })
-      }
+      vid.play().catch((err: unknown) => {
+        console.warn('[SlideVideo] Playback waiting or interrupted:', err)
+      })
     }
   }, [theme.videoPlaying, isSlideVideo, slideVideoSrc, compact, windowOpen, theme.videoMuted])
 
@@ -632,12 +545,9 @@ export function SlidePreviewStage({
     vid.muted = compact && windowOpen ? true : Boolean(theme.videoMuted)
     vid.volume = 1.0
     if (theme.videoPlaying !== false) {
-      const playPromise = vid.play()
-      if (playPromise !== undefined) {
-        playPromise.catch((err) => {
-          console.warn('[SlideVideo] Restart play error:', err)
-        })
-      }
+      vid.play().catch((err: unknown) => {
+        console.warn('[SlideVideo] Restart play error:', err)
+      })
     }
   }, [theme.videoRestartTime, theme.videoPlaying, compact, windowOpen, theme.videoMuted])
 
@@ -649,22 +559,23 @@ export function SlidePreviewStage({
     vid.currentTime = theme.videoSeekSeconds
   }, [theme.videoSeekTrigger, theme.videoSeekSeconds])
 
-  const rawLines = currentSlide?.lines ?? []
   const isBible = currentSlide?.sourceKind === 'bible'
   const hasExtraHeader = isBible || Boolean(live.theme.countdownEndIso)
   const isUppercase = Boolean(theme.uppercase)
-  const userScalePct = theme.fontScale ?? 100
+  const userScalePct = theme.fontScale
   const isAutoFit = theme.autoFit !== false
+  const slideLinesKey = currentSlide?.lines.join('\n')
 
   // Cálculo analítico óptimo inicial / fallback para SSR y JSDOM
   const optimalFont = useMemo(() => {
+    const rawLines = currentSlide?.lines ?? []
     return computeHolyricsOptimalFontSize({
       lines: rawLines,
       isUppercase,
       hasHeader: hasExtraHeader,
       userScalePct
     })
-  }, [rawLines, isUppercase, hasExtraHeader, userScalePct])
+  }, [currentSlide?.lines, isUppercase, hasExtraHeader, userScalePct])
 
   const isExtraLong = optimalFont.estimatedLines >= 5
   const paddingPct = isExtraLong ? 3.5 : (theme.paddingPct ?? 4.5)
@@ -698,7 +609,7 @@ export function SlidePreviewStage({
   // que aproveche al máximo el espacio disponible (alto y ancho), sin cortar palabras ni desbordar líneas.
   useLayoutEffect(() => {
     if (!isAutoFit) {
-      setMeasuredFontSizePx(null)
+      queueMicrotask(() => setMeasuredFontSizePx(null))
       return
     }
 
@@ -712,10 +623,10 @@ export function SlidePreviewStage({
     if (stageW <= 30 || stageH <= 30) return
 
     // Obtener padding real computado del escenario
-    let padTop = 0
-    let padBottom = 0
-    let padLeft = 0
-    let padRight = 0
+    let padTop: number
+    let padBottom: number
+    let padLeft: number
+    let padRight: number
     try {
       const stageStyle = window.getComputedStyle(stage)
       padTop = parseFloat(stageStyle.paddingTop) || 0
@@ -732,7 +643,7 @@ export function SlidePreviewStage({
     }
 
     // Cinta de alerta flotante si está activa
-    const tickerEl = stage.querySelector('.slide-stage__ticker') as HTMLElement | null
+    const tickerEl = stage.querySelector<HTMLElement>('.slide-stage__ticker')
     const tickerH = tickerEl ? tickerEl.offsetHeight + (compact ? 2 : 10) : 0
 
     // Alto y ancho útiles reales para el contenedor de texto (con 97% de margen de seguridad vertical)
@@ -753,7 +664,7 @@ export function SlidePreviewStage({
     const origTextShadow = body.style.textShadow
     const origFlexShrink = body.style.flexShrink
 
-    const headerEl = body.querySelector('.slide-stage__bible-header') as HTMLElement | null
+    const headerEl = body.querySelector<HTMLElement>('.slide-stage__bible-header')
     const origHeaderShadow = headerEl ? headerEl.style.textShadow : ''
 
     // Preparar contenedor para medición pura de flujo (top-left origin (0,0), sin blur de text-shadow
@@ -792,9 +703,7 @@ export function SlidePreviewStage({
     // Si el usuario aplicó un multiplicador en el slider manual
     // En modo Auto Fit (isAutoFit = true), el tamaño óptimo 'best' YA es el tamaño máximo perfecto medido en el DOM.
     // Solo permitimos que el slider escale hacia arriba o hacia abajo si NO está en modo Auto-Fit automático puro.
-    const userMult = (theme.fontScale ?? 100) / 100
-    const minAllowedPx = Math.max(7, Math.floor(stageH * 0.02))
-    const targetPx = (userMult !== 1 && !isAutoFit) ? Math.max(minAllowedPx, Math.round(best * userMult)) : best
+    const targetPx = best
 
     // Restaurar todos los estilos visuales y aplicar el tamaño óptimo medido
     if (headerEl) headerEl.style.textShadow = origHeaderShadow
@@ -810,7 +719,7 @@ export function SlidePreviewStage({
     setMeasuredFontSizePx((prev) => (prev === targetPx ? prev : targetPx))
   }, [
     currentSlide?.id,
-    currentSlide?.lines?.join('\n'),
+    slideLinesKey,
     currentSlide?.sourceKind,
     currentSlide?.sourceTitle,
     theme.fontFamily,
@@ -975,7 +884,7 @@ export function SlidePreviewStage({
   if (!isAutoFit) {
     // Modo Manual (Auto-Fit desactivado): el slider manual (60%-200%) controla el tamaño
     // usando la base tipográfica óptima como referencia de escala
-    const manualMult = (theme.fontScale ?? 100) / 100
+    const manualMult = theme.fontScale / 100
     effectiveFontSize = compact
       ? `${Math.max(8, Math.round(optimalFont.compactPx * manualMult))}px`
       : `min(${(optimalFont.vw * manualMult).toFixed(2)}vw, ${(optimalFont.maxLineVh * manualMult).toFixed(2)}vh)`
@@ -1149,12 +1058,9 @@ export function SlidePreviewStage({
               v.volume = 1.0
               v.muted = compact && windowOpen ? true : Boolean(theme.videoMuted)
               if (theme.videoPlaying !== false) {
-                const playPromise = v.play()
-                if (playPromise !== undefined) {
-                  playPromise.catch((err) => {
-                    console.warn('[SlideVideo] onCanPlay play error:', err)
-                  })
-                }
+                v.play().catch((err: unknown) => {
+                  console.warn('[SlideVideo] onCanPlay play error:', err)
+                })
               }
             }}
             style={{

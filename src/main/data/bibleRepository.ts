@@ -1,6 +1,7 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { BibleBookSummary, BibleVerse } from '../../shared/models'
+import type { BibleBookSummary, BibleVersionInfo, BibleVersionImportRequest, BibleVerse } from '../../shared/models'
+import { parseZefaniaXml } from '../../shared/bibleImport'
 import { DEFAULT_BIBLE_VERSES } from './defaultSeeds'
 
 export interface RawBibleBook {
@@ -231,8 +232,9 @@ function adaptVerseText(
 
   const key = `${bookName} ${chapter}`
   const passageMap = FAMOUS_PASSAGES[key]
-  if (passageMap && passageMap[version] && passageMap[version]![verse - 1]) {
-    return passageMap[version]![verse - 1]!
+  const knownVerse = passageMap ? passageMap[version]?.[verse - 1] : undefined
+  if (knownVerse) {
+    return knownVerse
   }
 
   let text = baseText
@@ -283,18 +285,194 @@ function adaptVerseText(
   return text
 }
 
+interface StoredVersionEntry {
+  id: string
+  name: string
+  abbrev?: string
+  fileName: string
+  importedAt: string
+}
+
+export const BUILTIN_BIBLE_VERSIONS: BibleVersionInfo[] = [
+  { id: 'rvr1960', name: 'Reina-Valera 1960', builtIn: true },
+  { id: 'rvr1909', name: 'Reina-Valera 1909', builtIn: true },
+  { id: 'nvi', name: 'Nueva Versión Internacional', builtIn: true },
+  { id: 'dhh', name: 'Dios Habla Hoy', builtIn: true },
+  { id: 'lbla', name: 'La Biblia de las Américas', builtIn: true },
+  { id: 'tla', name: 'Traducción en Lenguaje Actual', builtIn: true }
+]
+
 /**
- * Repositorio de la Biblia completa en español (66 libros, 1.189 capítulos, 31.104 versículos).
+ * Repositorio de la Biblia completa en español (66 libros, 1.189 capítulos, 31.104 versículos)
+ * con soporte de versiones propias importadas en formato XML Zefania (el que usa Holyrics),
+ * almacenadas en `bibleDir` (`versions.json` + `<id>.json`).
  */
 export class BibleRepository {
   private readonly books: readonly IndexedBook[]
+  private readonly bibleDir: string | undefined
+  private readonly versionBooksCache = new Map<string, IndexedBook[]>()
 
-  constructor() {
+  constructor(bibleDir?: string) {
     this.books = getIndexedBooks()
+    this.bibleDir = bibleDir
   }
 
-  listBooks(): BibleBookSummary[] {
-    return this.books.map((b) => {
+  // --- Catálogo de versiones ---
+
+  private get manifestPath(): string | null {
+    return this.bibleDir ? join(this.bibleDir, 'versions.json') : null
+  }
+
+  private readManifest(): StoredVersionEntry[] {
+    const path = this.manifestPath
+    if (!path || !existsSync(path)) return []
+    try {
+      const parsed = JSON.parse(readFileSync(path, 'utf-8').replace(/^\uFEFF/, '')) as unknown
+      if (!Array.isArray(parsed)) return []
+      return parsed.filter(
+        (e): e is StoredVersionEntry =>
+          !!e &&
+          typeof e === 'object' &&
+          typeof (e as StoredVersionEntry).id === 'string' &&
+          typeof (e as StoredVersionEntry).name === 'string' &&
+          typeof (e as StoredVersionEntry).fileName === 'string'
+      )
+    } catch {
+      return []
+    }
+  }
+
+  private writeManifest(entries: StoredVersionEntry[]): void {
+    const path = this.manifestPath
+    if (!path) return
+    try {
+      if (this.bibleDir && !existsSync(this.bibleDir)) {
+        mkdirSync(this.bibleDir, { recursive: true })
+      }
+      writeFileSync(path, JSON.stringify(entries, null, 2), 'utf-8')
+    } catch (err) {
+      console.warn('[BibleRepository] No se pudo guardar el manifiesto de versiones:', err)
+    }
+  }
+
+  listVersions(): BibleVersionInfo[] {
+    return [
+      ...BUILTIN_BIBLE_VERSIONS,
+      ...this.readManifest().map((e) => ({ id: e.id, name: e.name, builtIn: false }))
+    ]
+  }
+
+  /** Importa una Biblia en XML Zefania (formato Holyrics) y la registra como versión propia. */
+  importVersion(request: BibleVersionImportRequest): BibleVersionInfo[] {
+    const parsedBooks = parseZefaniaXml(request.content)
+    const name = request.name.trim().slice(0, 80)
+    if (!name) throw new Error('La versión necesita un nombre.')
+
+    const manifest = this.readManifest()
+    const base =
+      name
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 40) || 'version'
+    let id = base
+    let suffix = 2
+    while (manifest.some((e) => e.id === id) || BUILTIN_BIBLE_VERSIONS.some((v) => v.id === id)) {
+      id = `${base}-${suffix}`
+      suffix += 1
+    }
+
+    const fileName = `${id}.json`
+    if (this.bibleDir) {
+      try {
+        if (!existsSync(this.bibleDir)) mkdirSync(this.bibleDir, { recursive: true })
+        writeFileSync(join(this.bibleDir, fileName), JSON.stringify(parsedBooks), 'utf-8')
+      } catch (err) {
+        throw new Error('No se pudo guardar el archivo de la versión.', { cause: err })
+      }
+    }
+
+    const entry: StoredVersionEntry = {
+      id,
+      name,
+      ...(request.abbrev?.trim() ? { abbrev: request.abbrev.trim().slice(0, 16) } : {}),
+      fileName,
+      importedAt: new Date().toISOString()
+    }
+    this.writeManifest([...manifest, entry])
+    this.versionBooksCache.delete(id)
+    return this.listVersions()
+  }
+
+  /** Elimina una versión propia (las integradas no se pueden eliminar). */
+  deleteVersion(id: string): BibleVersionInfo[] {
+    const manifest = this.readManifest()
+    const entry = manifest.find((e) => e.id === id)
+    if (!entry) throw new Error('La versión no existe.')
+    if (this.bibleDir) {
+      try {
+        const filePath = join(this.bibleDir, entry.fileName)
+        if (existsSync(filePath)) rmSync(filePath)
+      } catch (err) {
+        console.warn('[BibleRepository] No se pudo eliminar el archivo de la versión:', err)
+      }
+    }
+    this.versionBooksCache.delete(id)
+    this.writeManifest(manifest.filter((e) => e.id !== id))
+    return this.listVersions()
+  }
+
+  private findStoredEntry(version?: string): StoredVersionEntry | undefined {
+    const raw = version?.trim()
+    if (!raw) return undefined
+    const q = normalizeText(raw)
+    return this.readManifest().find(
+      (e) => e.id === raw || normalizeText(e.name) === q || (e.abbrev ? normalizeText(e.abbrev) === q : false)
+    )
+  }
+
+  private getStoredBooks(entry: StoredVersionEntry): IndexedBook[] | null {
+    const cached = this.versionBooksCache.get(entry.id)
+    if (cached) return cached
+    if (!this.bibleDir) return null
+    try {
+      const filePath = join(this.bibleDir, entry.fileName)
+      if (!existsSync(filePath)) return null
+      const raw = readFileSync(filePath, 'utf-8').replace(/^\uFEFF/, '')
+      const parsed = JSON.parse(raw) as RawBibleBook[]
+      if (!Array.isArray(parsed) || parsed.length === 0) return null
+      const books = parsed.map((b, idx): IndexedBook => ({
+        index: idx,
+        abbrev: b.abbrev,
+        normAbbrev: normalizeText(b.abbrev),
+        name: b.name,
+        normName: normalizeText(b.name),
+        testament: idx < 39 ? 'AT' : 'NT',
+        chapters: b.chapters
+      }))
+      this.versionBooksCache.set(entry.id, books)
+      return books
+    } catch {
+      return null
+    }
+  }
+
+  /** Resuelve qué libros y etiqueta de versión usar según la versión pedida. */
+  private resolveVersion(
+    version?: string
+  ): { books: readonly IndexedBook[]; versionLabel: string; isImported: boolean } {
+    const entry = this.findStoredEntry(version)
+    if (entry) {
+      const stored = this.getStoredBooks(entry)
+      if (stored) return { books: stored, versionLabel: entry.name, isImported: true }
+    }
+    return { books: this.books, versionLabel: normalizeBibleVersionName(version), isImported: false }
+  }
+
+  listBooks(version?: string): BibleBookSummary[] {
+    return this.resolveVersion(version).books.map((b) => {
       const chapters: number[] = []
       b.chapters.forEach((verses, idx) => {
         if (verses.length > 0) chapters.push(idx + 1)
@@ -309,24 +487,25 @@ export class BibleRepository {
   }
 
   getChapter(book: string, chapter: number, version?: string): BibleVerse[] {
-    const target = findMatchingBook(book, this.books)
+    const { books, versionLabel, isImported } = this.resolveVersion(version)
+    const target = findMatchingBook(book, books)
     if (!target) return []
     const verses = target.chapters[chapter - 1]
     if (!verses) return []
-
-    const effectiveVer = normalizeBibleVersionName(version)
 
     const result: BibleVerse[] = []
     verses.forEach((text, idx) => {
       if (text) {
         const verseNum = idx + 1
-        const adaptedText = adaptVerseText(text, target.name, chapter, verseNum, effectiveVer)
+        const verseText = isImported
+          ? text
+          : adaptVerseText(text, target.name, chapter, verseNum, versionLabel)
         result.push({
           book: target.name,
           chapter,
           verse: verseNum,
-          text: adaptedText,
-          version: effectiveVer
+          text: verseText,
+          version: versionLabel
         })
       }
     })
@@ -335,9 +514,9 @@ export class BibleRepository {
 
   search(query: string, limit = 60, version?: string): BibleVerse[] {
     const trimmed = query.trim()
-    const effectiveVer = normalizeBibleVersionName(version)
+    const { books, versionLabel, isImported } = this.resolveVersion(version)
     if (!trimmed) {
-      return this.getChapter('Salmos', 23, effectiveVer)
+      return this.getChapter('Salmos', 23, version)
     }
 
     // 1. Cita bíblica directa: ej. "Juan 3:16", "jn3:16", "jn 3 16", "Salmos 23:1-6", "1co13:4-8", "Gn 1:1"
@@ -351,9 +530,9 @@ export class BibleRepository {
       const verseStart = refMatch[3] ? Number(refMatch[3]) : undefined
       const verseEnd = refMatch[4] ? Number(refMatch[4]) : verseStart
 
-      const targetBook = findMatchingBook(bookPart, this.books)
+      const targetBook = findMatchingBook(bookPart, books)
       if (targetBook && chapter >= 1 && chapter <= targetBook.chapters.length) {
-        const chapterVerses = this.getChapter(targetBook.name, chapter, effectiveVer)
+        const chapterVerses = this.getChapter(targetBook.name, chapter, version)
         if (verseStart !== undefined && verseEnd !== undefined) {
           return chapterVerses.filter((v) => v.verse >= verseStart && v.verse <= verseEnd)
         }
@@ -361,14 +540,14 @@ export class BibleRepository {
       }
     }
 
-    // 2. Búsqueda de texto completo en los 66 libros (acento-insensible, con límite)
+    // 2. Búsqueda de texto completo en los libros de la versión activa (acento-insensible, con límite)
     const terms = normalizeText(trimmed)
       .split(/\s+/)
       .filter((t) => t.length >= 2)
     if (terms.length === 0) return []
 
     const matches: BibleVerse[] = []
-    for (const b of this.books) {
+    for (const b of books) {
       for (let chIdx = 0; chIdx < b.chapters.length; chIdx++) {
         const ch = b.chapters[chIdx]
         if (!ch) continue
@@ -378,13 +557,15 @@ export class BibleRepository {
           const normVerse = normalizeText(text)
           if (terms.every((t) => normVerse.includes(t))) {
             const verseNum = vIdx + 1
-            const adapted = adaptVerseText(text, b.name, chIdx + 1, verseNum, effectiveVer)
+            const verseText = isImported
+              ? text
+              : adaptVerseText(text, b.name, chIdx + 1, verseNum, versionLabel)
             matches.push({
               book: b.name,
               chapter: chIdx + 1,
               verse: verseNum,
-              text: adapted,
-              version: effectiveVer
+              text: verseText,
+              version: versionLabel
             })
             if (matches.length >= limit) return matches
           }

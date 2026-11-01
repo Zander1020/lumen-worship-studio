@@ -4,7 +4,7 @@ import JSZip from 'jszip'
 import type { PresentationSlide } from '../../../../shared/models'
 
 // Configurar worker de pdfjs en entorno web/renderer
-if (typeof window !== 'undefined' && pdfjsLib.GlobalWorkerOptions) {
+if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker
 }
 
@@ -20,7 +20,7 @@ export interface ParsedDocumentDeck {
 }
 
 /**
- * Convierte un archivo PDF a diapositivas proyectables HD en formato imagen de alta resolución.
+ * Convierte un archivo PDF a diapositivas proyectables HD en formato imagen de alta resoluciÃ³n.
  */
 export async function convertPdfToSlides(
   fileOrBuffer: File | ArrayBuffer | Uint8Array,
@@ -45,11 +45,11 @@ export async function convertPdfToSlides(
 
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum)
-    // Escala para resolución Full HD nítida
+    // Escala para resoluciÃ³n Full HD nÃ­tida
     const viewport = page.getViewport({ scale: 2.0 })
 
     let dataUrl: string | undefined = undefined
-    if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
+    if (typeof document !== 'undefined') {
       try {
         const canvas = document.createElement('canvas')
         const ctx = canvas.getContext('2d')
@@ -65,7 +65,7 @@ export async function convertPdfToSlides(
           dataUrl = canvas.toDataURL('image/jpeg', 0.92)
         }
       } catch (renderErr) {
-        console.warn('[PDF] Error al renderizar lienzo de página:', renderErr)
+        console.warn('[PDF] Error al renderizar lienzo de pÃ¡gina:', renderErr)
       }
     }
 
@@ -73,9 +73,9 @@ export async function convertPdfToSlides(
       id: `pdf-${Date.now()}-${pageNum}`,
       sourceKind: 'custom',
       sourceTitle: baseName,
-      label: `Página ${pageNum}`,
+      label: `PÃ¡gina ${pageNum}`,
       lines: [],
-      footer: `${baseName} · Pág. ${pageNum} de ${pdf.numPages}`,
+      footer: `${baseName} Â· PÃ¡g. ${pageNum} de ${pdf.numPages}`,
       ...(dataUrl ? { imageUrl: dataUrl, mediaKind: 'image' } : { mediaKind: 'image' })
     })
   }
@@ -87,8 +87,8 @@ export async function convertPdfToSlides(
 }
 
 /**
- * Función auxiliar para dividir líneas de texto largas en múltiples renglones
- * que quepan cómodamente en el lienzo Canvas sin deformar la tipografía.
+ * FunciÃ³n auxiliar para dividir lÃ­neas de texto largas en mÃºltiples renglones
+ * que quepan cÃ³modamente en el lienzo Canvas sin deformar la tipografÃ­a.
  */
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   if (!text) return []
@@ -112,10 +112,10 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
 }
 
 /**
- * Busca un archivo dentro del ZIP de forma tolerante a mayúsculas/minúsculas y barras invertidas.
+ * Busca un archivo dentro del ZIP de forma tolerante a mayÃºsculas/minÃºsculas y barras invertidas.
  */
 function findZipFileCaseInsensitive(zip: JSZip, targetPath: string): JSZip.JSZipObject | null {
-  const cleanTarget = targetPath.replace(/^(\.\.[\/\\])+/, '').replace(/^\/+/, '')
+  const cleanTarget = targetPath.replace(/^(\.\.[/\\])+/, '').replace(/^\/+/, '')
   const exact = zip.file(cleanTarget)
   if (exact) return exact
   const normalized = cleanTarget.toLowerCase().replace(/\\/g, '/')
@@ -159,7 +159,7 @@ function extractFallbackFromBinaryPpt(
   const ignored = /^(Calibri|Arial|Times|Verdana|Segoe|Tahoma|Wingdings|Symbol|Microsoft|Current User|PowerPoint Document|SummaryInformation|DocumentSummaryInformation|Default Design|_PID_)/i
   const validLines = extractedStrings
     .map((s) => s.trim())
-    .filter((s) => s.length >= 4 && !ignored.test(s) && /[a-zA-ZáéíóúÁÉÍÓÚñÑ]/.test(s))
+    .filter((s) => s.length >= 4 && !ignored.test(s) && /[a-zA-ZÃ¡Ã©Ã­Ã³ÃºÃÃ‰ÃÃ“ÃšÃ±Ã‘]/.test(s))
 
   const slides: PresentationSlide[] = []
   if (validLines.length > 0) {
@@ -173,7 +173,7 @@ function extractFallbackFromBinaryPpt(
         sourceTitle: baseName,
         label: `Diapositiva ${slideIndex}`,
         lines: chunk,
-        footer: `${baseName} · Diapositiva ${slideIndex}`
+        footer: `${baseName} Â· Diapositiva ${slideIndex}`
       })
       slideIndex++
     }
@@ -187,11 +187,11 @@ function extractFallbackFromBinaryPpt(
       label: 'Diapositiva 1',
       lines: [
         baseName,
-        'Presentación PowerPoint (.ppt binario)',
-        'Para una experiencia visual idéntica con fondos y fuentes de PowerPoint,',
-        'guarda el archivo en PowerPoint como .pptx o .pdf y cárgalo de nuevo.'
+        'PresentaciÃ³n PowerPoint (.ppt binario)',
+        'Para una experiencia visual idÃ©ntica con fondos y fuentes de PowerPoint,',
+        'guarda el archivo en PowerPoint como .pptx o .pdf y cÃ¡rgalo de nuevo.'
       ],
-      footer: `${baseName} · Presentación`
+      footer: `${baseName} Â· PresentaciÃ³n`
     })
   }
 
@@ -202,12 +202,12 @@ function extractFallbackFromBinaryPpt(
 }
 
 /**
- * Extrae texto de un fragmento XML de PowerPoint usando múltiples métodos tolerantes a namespaces.
+ * Extrae texto de un fragmento XML de PowerPoint usando mÃºltiples mÃ©todos tolerantes a namespaces.
  */
 function extractLinesFromOpenXml(xmlText: string): string[] {
   const lines: string[] = []
 
-  // Normalizar saltos de línea explícitos dentro de párrafos <a:br/>
+  // Normalizar saltos de lÃ­nea explÃ­citos dentro de pÃ¡rrafos <a:br/>
   const normalizedXml = xmlText.replace(/<[^:>]*:?br\b[^>]*\/?>/gi, '\n')
 
   // 1. Intento por DOMParser
@@ -238,7 +238,7 @@ function extractLinesFromOpenXml(xmlText: string): string[] {
     }
   }
 
-  // 2. Extracción por Regex (100% inmune a namespaces XML complejos o malformados)
+  // 2. ExtracciÃ³n por Regex (100% inmune a namespaces XML complejos o malformados)
   if (lines.length === 0) {
     const pMatches = Array.from(normalizedXml.matchAll(/<[^:>]*:?p[\s>]([\s\S]*?)<\/[^:>]*:?p>/gi))
     for (const pm of pMatches) {
@@ -296,7 +296,7 @@ async function renderPptxSlideToHdCanvas(
   slideIndex = 1,
   totalSlides = 1
 ): Promise<string | undefined> {
-  if (typeof document === 'undefined' || typeof document.createElement !== 'function') {
+  if (typeof document === 'undefined') {
     return imageSrc
   }
 
@@ -324,19 +324,19 @@ async function renderPptxSlideToHdCanvas(
     }
 
     if (loadedImg) {
-      // CASO 1 y 2: Hay imagen → usarla como FONDO REAL que llena el canvas completo
-      // Escalar "cover" (recortar para llenar sin distorsión)
+      // CASO 1 y 2: Hay imagen â†’ usarla como FONDO REAL que llena el canvas completo
+      // Escalar "cover" (recortar para llenar sin distorsiÃ³n)
       const imgAspect = loadedImg.width / loadedImg.height
       const canvasAspect = 1920 / 1080
       let dw: number, dh: number, dx: number, dy: number
       if (imgAspect > canvasAspect) {
-        // Imagen más ancha que el canvas → ajustar por altura, centrar horizontalmente
+        // Imagen mÃ¡s ancha que el canvas â†’ ajustar por altura, centrar horizontalmente
         dh = 1080
         dw = 1080 * imgAspect
         dx = (1920 - dw) / 2
         dy = 0
       } else {
-        // Imagen más alta → ajustar por anchura, centrar verticalmente
+        // Imagen mÃ¡s alta â†’ ajustar por anchura, centrar verticalmente
         dw = 1920
         dh = 1920 / imgAspect
         dx = 0
@@ -383,7 +383,7 @@ async function renderPptxSlideToHdCanvas(
         ctx.shadowBlur = 0
       }
     } else {
-      // CASO 3: Solo texto → fondo oscuro neutro + texto claro y legible
+      // CASO 3: Solo texto â†’ fondo oscuro neutro + texto claro y legible
       const bgGrad = ctx.createLinearGradient(0, 0, 0, 1080)
       bgGrad.addColorStop(0, '#1a1f2e')
       bgGrad.addColorStop(1, '#0d1117')
@@ -392,7 +392,7 @@ async function renderPptxSlideToHdCanvas(
 
       if (lines.length > 0) {
         if (lines.length <= 3) {
-          // Pocas líneas (título o anuncio corto): Centrado cinematográfico
+          // Pocas lÃ­neas (tÃ­tulo o anuncio corto): Centrado cinematogrÃ¡fico
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
           ctx.fillStyle = '#38bdf8'
@@ -449,7 +449,7 @@ async function renderPptxSlideToHdCanvas(
           }
         }
       } else {
-        // Diapositiva vacía — mostrar título del documento
+        // Diapositiva vacÃ­a â€” mostrar tÃ­tulo del documento
         ctx.fillStyle = '#64748b'
         ctx.font = 'bold 40px system-ui, -apple-system, sans-serif'
         ctx.textBaseline = 'middle'
@@ -459,7 +459,7 @@ async function renderPptxSlideToHdCanvas(
         ctx.textBaseline = 'top'
       }
 
-      // Pie de página sutil
+      // Pie de pÃ¡gina sutil
       ctx.strokeStyle = 'rgba(255,255,255,0.1)'
       ctx.lineWidth = 1
       ctx.beginPath()
@@ -468,20 +468,20 @@ async function renderPptxSlideToHdCanvas(
       ctx.stroke()
       ctx.fillStyle = '#475569'
       ctx.font = '22px system-ui, -apple-system, sans-serif'
-      ctx.fillText(`${title}  ·  Diapositiva ${slideIndex} de ${totalSlides}`, 100, 1028)
+      ctx.fillText(`${title}  Â·  Diapositiva ${slideIndex} de ${totalSlides}`, 100, 1028)
     }
 
     return canvas.toDataURL('image/jpeg', 0.93)
   } catch (err) {
-    console.warn('[PPTX] Error al generar lienzo HD para lámina:', err)
+    console.warn('[PPTX] Error al generar lienzo HD para lÃ¡mina:', err)
     return imageSrc
   }
 }
 
 /**
- * Extrae y parsea diapositivas de una presentación PowerPoint (.pptx).
- * Un archivo .pptx es un paquete ZIP con especificación OpenXML.
- * Compatible con cualquier presentación creada en PowerPoint (2007-365), Google Slides, LibreOffice o Keynote.
+ * Extrae y parsea diapositivas de una presentaciÃ³n PowerPoint (.pptx).
+ * Un archivo .pptx es un paquete ZIP con especificaciÃ³n OpenXML.
+ * Compatible con cualquier presentaciÃ³n creada en PowerPoint (2007-365), Google Slides, LibreOffice o Keynote.
  */
 export async function convertPptxToSlides(
   fileOrBuffer: File | ArrayBuffer | Uint8Array,
@@ -499,7 +499,7 @@ export async function convertPptxToSlides(
   try {
     zip = await JSZip.loadAsync(data)
   } catch (zipErr) {
-    console.warn('[PPTX] No es un paquete ZIP OpenXML estándar (posible formato binario .ppt o protegido):', zipErr)
+    console.warn('[PPTX] No es un paquete ZIP OpenXML estÃ¡ndar (posible formato binario .ppt o protegido):', zipErr)
     return extractFallbackFromBinaryPpt(data, baseName)
   }
   const slides: PresentationSlide[] = []
@@ -512,7 +512,7 @@ export async function convertPptxToSlides(
     const presRelsXml = await (findZipFileCaseInsensitive(zip, 'ppt/_rels/presentation.xml.rels')?.async('text') ?? Promise.resolve(null))
 
     if (presXml && presRelsXml) {
-      // Mapear relación rId -> ruta de slide
+      // Mapear relaciÃ³n rId -> ruta de slide
       const relMap = new Map<string, string>()
       const relMatches = Array.from(
         presRelsXml.matchAll(/Id="([^"]+)"[^>]*Target="([^"]+)"/gi)
@@ -562,7 +562,7 @@ export async function convertPptxToSlides(
     const lines = extractLinesFromOpenXml(slideXmlText)
 
     // Extraer imagen(es) si existe en relaciones _rels/slideX.xml.rels
-    // Prioridad: imagen de mayor resolución (la que tenga mayor índice suele ser la principal)
+    // Prioridad: imagen de mayor resoluciÃ³n (la que tenga mayor Ã­ndice suele ser la principal)
     let embeddedImageUrl: string | undefined = undefined
     const relsPath = slidePath.replace(/(?:^|\/)slide(\d+)\.xml$/i, '/_rels/slide$1.xml.rels')
     const relsFile = findZipFileCaseInsensitive(zip, relsPath)
@@ -571,14 +571,14 @@ export async function convertPptxToSlides(
       const imageRels = Array.from(
         relsXml.matchAll(/Type="[^"]*\/image"[^>]*Target="([^"]+)"/gi)
       )
-      // Recolectar todas las imágenes disponibles para elegir la más grande
+      // Recolectar todas las imÃ¡genes disponibles para elegir la mÃ¡s grande
       const candidateImages: Array<{ url: string; size: number }> = []
       for (const ir of imageRels) {
         let rawTarget = ir[1] ?? ''
         try { rawTarget = decodeURIComponent(rawTarget) } catch { /* mantener */ }
         let mediaPath = rawTarget.replace(/^\.\.\//, '').replace(/^\//, '')
         if (!mediaPath.startsWith('ppt/')) mediaPath = `ppt/${mediaPath}`
-        // Ignorar EMF/WMF (metaarchivos vectoriales) — no son imágenes rasterizadas
+        // Ignorar EMF/WMF (metaarchivos vectoriales) â€” no son imÃ¡genes rasterizadas
         const ext = mediaPath.split('.').pop()?.toLowerCase() ?? ''
         if (['emf', 'wmf', 'bin'].includes(ext)) continue
         const imgZip = findZipFileCaseInsensitive(zip, mediaPath)
@@ -596,14 +596,14 @@ export async function convertPptxToSlides(
         }
       }
       if (candidateImages.length > 0) {
-        // Elegir la imagen de mayor tamaño (generalmente la imagen principal)
+        // Elegir la imagen de mayor tamaÃ±o (generalmente la imagen principal)
         candidateImages.sort((a, b) => b.size - a.size)
         embeddedImageUrl = candidateImages[0]?.url
       } else {
         // Si la diapositiva no tiene imagen directa, buscar si el slideLayout tiene fondo
         const layoutMatch = relsXml.match(/Type="[^"]*\/slideLayout"[^>]*Target="([^"]+)"/i)
         if (layoutMatch) {
-          const layoutTarget = (layoutMatch[1] ?? '').replace(/^(\.\.[\/\\])+/, '').replace(/^\/+/, '')
+          const layoutTarget = (layoutMatch[1] ?? '').replace(/^(\.\.[/\\])+/, '').replace(/^\/+/, '')
           const cleanLayoutPath = layoutTarget.startsWith('ppt/') ? layoutTarget : `ppt/${layoutTarget}`
           const layoutRelsPath = cleanLayoutPath.replace(/(?:^|\/)slideLayout(\d+)\.xml$/i, '/_rels/slideLayout$1.xml.rels')
           const layoutRelsFile = findZipFileCaseInsensitive(zip, layoutRelsPath)
@@ -615,7 +615,7 @@ export async function convertPptxToSlides(
             for (const ir of layoutImageRels) {
               let rawTarget = ir[1] ?? ''
               try { rawTarget = decodeURIComponent(rawTarget) } catch { /* mantener */ }
-              let mediaPath = rawTarget.replace(/^(\.\.[\/\\])+/, '').replace(/^\/+/, '')
+              let mediaPath = rawTarget.replace(/^(\.\.[/\\])+/, '').replace(/^\/+/, '')
               if (!mediaPath.startsWith('ppt/')) mediaPath = `ppt/${mediaPath}`
               const ext = mediaPath.split('.').pop()?.toLowerCase() ?? ''
               if (['emf', 'wmf', 'bin'].includes(ext)) continue
@@ -632,7 +632,7 @@ export async function convertPptxToSlides(
       }
     }
 
-    // Respaldo global si no se encontró imagen: buscar en ppt/media/
+    // Respaldo global si no se encontrÃ³ imagen: buscar en ppt/media/
     if (!embeddedImageUrl) {
       const mediaImages: string[] = []
       zip.forEach((path) => {
@@ -665,7 +665,7 @@ export async function convertPptxToSlides(
 
     const slideNum = idx + 1
 
-    // Generar renderizado HD visual para la lámina
+    // Generar renderizado HD visual para la lÃ¡mina
     const hdImageUrl = await renderPptxSlideToHdCanvas(
       baseName,
       lines,
@@ -680,16 +680,16 @@ export async function convertPptxToSlides(
       sourceTitle: baseName,
       label: `Diapositiva ${slideNum}`,
       lines: lines.slice(0, 10),
-      footer: `${baseName} · Diapositiva ${slideNum} de ${totalSlides}`,
+      footer: `${baseName} Â· Diapositiva ${slideNum} de ${totalSlides}`,
       ...(hdImageUrl ? { imageUrl: hdImageUrl, mediaKind: 'image' } : {})
     })
   }
 
-  // Si no se encontraron diapositivas XML o viene protegido, generar lámina de presentación
+  // Si no se encontraron diapositivas XML o viene protegido, generar lÃ¡mina de presentaciÃ³n
   if (slides.length === 0) {
     const coverUrl = await renderPptxSlideToHdCanvas(
       baseName,
-      [baseName, 'Presentación de Diapositivas'],
+      [baseName, 'PresentaciÃ³n de Diapositivas'],
       undefined,
       1,
       1
@@ -700,7 +700,7 @@ export async function convertPptxToSlides(
       sourceTitle: baseName,
       label: 'Diapositiva 1',
       lines: [baseName],
-      footer: `${baseName} · Presentación`,
+      footer: `${baseName} Â· PresentaciÃ³n`,
       ...(coverUrl ? { imageUrl: coverUrl, mediaKind: 'image' } : { mediaKind: 'image' })
     })
   }

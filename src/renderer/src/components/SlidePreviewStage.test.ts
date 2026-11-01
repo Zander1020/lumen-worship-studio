@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeHolyricsOptimalFontSize } from './SlidePreviewStage'
+import { computeHolyricsOptimalFontSize } from './holyricsFontFit'
 
 describe('computeHolyricsOptimalFontSize (Ajuste Automático Inteligente estilo Holyrics)', () => {
   it('maximiza versículo mediano como Juan 3:18 o Salmo 23:4 ocupando la pantalla con letra grande y legible', () => {

@@ -6,6 +6,8 @@ import type {
   AiSuggestionResult,
   AppSettings,
   BibleBookSummary,
+  BibleVersionImportRequest,
+  BibleVersionInfo,
   BibleVerse,
   HolyricsImportItem,
   MediaBackground,
@@ -51,7 +53,7 @@ export class WorkspaceStore {
   private media: MediaBackground[]
   private presentations: PresentationDeck[]
   private settings: AppSettings
-  private readonly bible = new BibleRepository()
+  private readonly bible: BibleRepository
   private readonly filePath: string | undefined
   private readonly mediaDir: string
   private readonly backgroundsDir: string
@@ -63,6 +65,7 @@ export class WorkspaceStore {
     this.mediaDir = join(baseDir, 'media')
     this.backgroundsDir = join(baseDir, 'fondos')
     this.slidesDir = join(baseDir, 'diapositivas')
+    this.bible = new BibleRepository(join(baseDir, 'bible'))
     try {
       if (!existsSync(this.mediaDir)) {
         mkdirSync(this.mediaDir, { recursive: true })
@@ -100,7 +103,7 @@ export class WorkspaceStore {
       return false
     }
 
-    let mediaCleaned = false
+    const mediaCountBefore = this.media.length
     this.media = this.media.filter((m) => {
       if (isDocumentItem(m)) {
         if (m.slides && m.slides.length > 0) {
@@ -115,12 +118,11 @@ export class WorkspaceStore {
             })
           }
         }
-        mediaCleaned = true
         return false // Excluir permanentemente de Medios
       }
       return true
     })
-    if (mediaCleaned) {
+    if (this.media.length !== mediaCountBefore) {
       this.saveToDisk()
     }
 
@@ -134,7 +136,7 @@ export class WorkspaceStore {
             if (comma !== -1) {
               const rawB64 = item.value.slice(comma + 1)
               const ext = item.kind === 'video' ? '.mp4' : '.png'
-              const safeName = item.name.replace(/[^a-zA-Z0-9_\-]/g, '_')
+              const safeName = item.name.replace(/[^a-zA-Z0-9_-]/g, '_')
               const fileName = `${safeName}${ext}`
               const targetPath = join(this.mediaDir, fileName)
               if (!existsSync(targetPath)) {
@@ -308,18 +310,30 @@ export class WorkspaceStore {
     return this.listSongs()
   }
 
-  // --- Biblia completa (66 libros) ---
+  // --- Biblia completa (66 libros + versiones propias importadas) ---
 
-  listBibleBooks(): BibleBookSummary[] {
-    return this.bible.listBooks()
+  listBibleVersions(): BibleVersionInfo[] {
+    return this.bible.listVersions()
+  }
+
+  importBibleVersion(request: BibleVersionImportRequest): BibleVersionInfo[] {
+    return this.bible.importVersion(request)
+  }
+
+  deleteBibleVersion(id: string): BibleVersionInfo[] {
+    return this.bible.deleteVersion(id)
+  }
+
+  listBibleBooks(version?: string): BibleBookSummary[] {
+    return this.bible.listBooks(version)
   }
 
   getBibleChapter(book: string, chapter: number, version?: string): BibleVerse[] {
     return this.bible.getChapter(book, chapter, version)
   }
 
-  searchBible(query: string): BibleVerse[] {
-    return this.bible.search(query, 60)
+  searchBible(query: string, version?: string): BibleVerse[] {
+    return this.bible.search(query, 60, version)
   }
 
   // --- Programación del culto ---
@@ -388,7 +402,6 @@ export class WorkspaceStore {
   }
 
   private isDocument(item: { name?: string; value?: string; category?: string; slides?: unknown[] }): boolean {
-    if (!item) return false
     if ((item.slides && item.slides.length > 0) || item.slides !== undefined) return true
     const n = (item.name || '').toLowerCase()
     if (/\.(pdf|pptx|ppt|ppsx|pps|potx)($|[?#])/i.test(n) || /^(pdf|powerpoint):/i.test(n)) return true
@@ -453,7 +466,7 @@ export class WorkspaceStore {
           if (comma !== -1) {
             const rawB64 = input.value.slice(comma + 1)
             const ext = input.kind === 'video' ? '.mp4' : '.png'
-            const safeName = input.name.replace(/[^a-zA-Z0-9_\-]/g, '_')
+            const safeName = input.name.replace(/[^a-zA-Z0-9_-]/g, '_')
             const fileName = `${safeName}${ext}`
             const targetPath = join(destDir, fileName)
             if (!existsSync(targetPath)) {

@@ -7,7 +7,7 @@ export function AboutPage() {
   useEffect(() => {
     if (window.lumen?.getAppInfo) {
       window.lumen.getAppInfo().then((info) => {
-        if (info?.version) {
+        if (info.version) {
           setVersion(info.version)
         }
       }).catch(() => undefined)

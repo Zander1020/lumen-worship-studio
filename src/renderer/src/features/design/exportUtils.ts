@@ -302,19 +302,19 @@ export function downloadDataUrl(dataUrl: string, filename: string): void {
 }
 
 /**
- * Guarda el proyecto serializado en formato .lumen-design (JSON).
+ * Guarda el proyecto serializado en formato .lumen (JSON editable).
  */
 export function exportProjectFile(project: GraphicDesignProject): void {
   const jsonStr = JSON.stringify(project, null, 2)
   const blob = new Blob([jsonStr], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
-  const filename = `${project.name.toLowerCase().replace(/[^a-z0-9_-]/g, '_') || 'diseno'}.lumen-design`
+  const filename = `${project.name.toLowerCase().replace(/[^a-z0-9_-]/g, '_') || 'diseno'}.lumen`
   downloadDataUrl(url, filename)
   URL.revokeObjectURL(url)
 }
 
 /**
- * Parsea y normaliza un archivo de proyecto JSON .lumen-design.
+ * Parsea y normaliza un archivo de proyecto JSON .lumen (compatible con el antiguo .lumen-design).
  */
 export function parseProjectFile(jsonContent: string): GraphicDesignProject {
   const parsed: unknown = JSON.parse(jsonContent)

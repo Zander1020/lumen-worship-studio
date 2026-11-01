@@ -1,5 +1,5 @@
 import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
-import type { MediaBackground, PresentationSlide, Song } from '../../../../shared/ipc'
+import type { HolyricsImportItem, MediaBackground, PresentationSlide, Song } from '../../../../shared/ipc'
 import {
   autoSplitLongStanzas,
   cleanInternetLyrics,
@@ -93,7 +93,7 @@ export function HomePage({ app }: HomePageProps) {
         try {
           const deck = await convertPdfToSlides(file, file.name)
           if (deck.slides.length > 0) {
-            void app.savePresentation?.({
+            void app.savePresentation({
               id: `pdf-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               title: deck.title,
               subtitle: `${deck.slides.length} páginas · PDF`,
@@ -125,7 +125,7 @@ export function HomePage({ app }: HomePageProps) {
         try {
           const deck = await convertPptxToSlides(file, file.name)
           if (deck.slides.length > 0) {
-            void app.savePresentation?.({
+            void app.savePresentation({
               id: `pptx-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               title: deck.title,
               subtitle: `${deck.slides.length} diapositivas · PowerPoint`,
@@ -208,14 +208,17 @@ export function HomePage({ app }: HomePageProps) {
 
   // Estado de edición rápida de alabanza (clic derecho -> Editar alabanza)
   const [editingSong, setEditingSong] = useState<Song | null>(null)
+  const [isCreatingSong, setIsCreatingSong] = useState(false)
   const [editTitle, setEditTitle] = useState('')
   const [editAuthor, setEditAuthor] = useState('')
   const [editKey, setEditKey] = useState('')
   const [editBpm, setEditBpm] = useState<number | null>(null)
   const [editRawLyrics, setEditRawLyrics] = useState('')
+  const songBatchInputRef = useRef<HTMLInputElement | null>(null)
 
   const openSongEditor = (song: Song): void => {
     setEditingSong(song)
+    setIsCreatingSong(false)
     setEditTitle(song.title)
     setEditAuthor(song.author || '')
     setEditKey(song.musicalKey || '')
@@ -224,19 +227,66 @@ export function HomePage({ app }: HomePageProps) {
     setEditRawLyrics(raw)
   }
 
+  const openCreateSong = (): void => {
+    setEditingSong(null)
+    setIsCreatingSong(true)
+    setEditTitle('')
+    setEditAuthor('')
+    setEditKey('')
+    setEditBpm(null)
+    setEditRawLyrics('')
+  }
+
+  const closeSongModal = (): void => {
+    setEditingSong(null)
+    setIsCreatingSong(false)
+  }
+
   const handleSaveEditedSong = async (): Promise<void> => {
-    if (!editingSong || !editTitle.trim()) return
+    if (!editTitle.trim()) return
     const stanzas = parseRawLyricsToStanzas(editRawLyrics.trim() || 'Letra')
     await app.upsertSong({
-      id: editingSong.id,
+      ...(editingSong ? { id: editingSong.id, tags: editingSong.tags } : { tags: ['Alabanza'] }),
       title: editTitle.trim(),
       author: editAuthor.trim(),
       musicalKey: editKey.trim() || '—',
       bpm: editBpm ?? null,
-      tags: editingSong.tags,
       stanzas
     })
-    setEditingSong(null)
+    closeSongModal()
+  }
+
+  const processSongFileList = async (fileList: FileList): Promise<void> => {
+    const items: HolyricsImportItem[] = []
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i]
+      if (!file) continue
+      if (file.name.toLowerCase().endsWith('.mufl')) {
+        const arrayBuf = await file.arrayBuffer()
+        const bytes = new Uint8Array(arrayBuf)
+        let binary = ''
+        const chunkSize = 8192
+        for (let j = 0; j < bytes.length; j += chunkSize) {
+          const chunk = bytes.subarray(j, j + chunkSize)
+          binary += String.fromCharCode.apply(null, Array.from(chunk))
+        }
+        const base64 = btoa(binary)
+        items.push({ content: `base64:${base64}`, fileName: file.name })
+      } else {
+        const content = await file.text()
+        items.push({ content, fileName: file.name })
+      }
+    }
+    if (items.length > 0) {
+      await app.importHolyricsCatalog(items)
+    }
+  }
+
+  const handleSongBatchSelected = async (e: ChangeEvent<HTMLInputElement>): Promise<void> => {
+    if (e.target.files && e.target.files.length > 0) {
+      await processSongFileList(e.target.files)
+    }
+    e.target.value = ''
   }
 
   // Opción para mostrar u ocultar la columna de etiquetas en la tabla de diapositivas
@@ -327,7 +377,7 @@ export function HomePage({ app }: HomePageProps) {
     const seenTitles = new Set<string>()
 
     // 1. Presentaciones guardadas en la base de datos de diapositivas
-    ;(app.presentations || []).forEach((p) => {
+    ;app.presentations.forEach((p) => {
       const lower = p.title.toLowerCase()
       if (!seenTitles.has(lower)) {
         seenTitles.add(lower)
@@ -391,22 +441,26 @@ export function HomePage({ app }: HomePageProps) {
 
   // Si se proyecta o carga un documento desde el dock o el cronograma, abrir su pestaña y seleccionarlo
   useEffect(() => {
-    if (!live?.deckTitle || !live.slides || live.slides.length <= 1) return
+    if (!live?.deckTitle || live.slides.length <= 1) return
     const isDoc =
       live.slides.some((s) => s.label.toLowerCase().includes('página') || s.label.toLowerCase().includes('diapositiva')) ||
       live.deckTitle.toLowerCase().includes('pdf') ||
       live.deckTitle.toLowerCase().includes('powerpoint') ||
       live.deckTitle.toLowerCase().includes('presentaci')
     if (isDoc) {
-      setOpenDocTabs((prev) => {
-        const exists = prev.some((d) => d.title === live.deckTitle)
-        if (!exists) {
-          return [...prev, { id: `doc-${Date.now()}`, title: live.deckTitle, slides: live.slides }]
-        }
-        return prev
+      const deckTitle = live.deckTitle
+      const slides = live.slides
+      queueMicrotask(() => {
+        setOpenDocTabs((prev) => {
+          const exists = prev.some((d) => d.title === deckTitle)
+          if (!exists) {
+            return [...prev, { id: `doc-${Date.now()}`, title: deckTitle, slides }]
+          }
+          return prev
+        })
+        setSelectedDocId(deckTitle)
+        setActiveTab('presentation')
       })
-      setSelectedDocId(live.deckTitle)
-      setActiveTab('presentation')
     }
   }, [live?.deckTitle, live?.slides])
 
@@ -445,7 +499,7 @@ export function HomePage({ app }: HomePageProps) {
           s.title.toLowerCase().includes(selectedMedia.name.toLowerCase()) ||
           selectedMedia.name.toLowerCase().includes(s.title.toLowerCase().replace(/^(pdf|powerpoint):\s*/i, ''))
       )
-      if (matchSchedule && matchSchedule.slides && matchSchedule.slides.length > 0) {
+      if (matchSchedule && matchSchedule.slides.length > 0) {
         return matchSchedule.slides
       }
       const isVid = selectedMedia.kind === 'video' || isVideoUrl(selectedMedia.value)
@@ -510,7 +564,7 @@ export function HomePage({ app }: HomePageProps) {
     const deckSlides: PresentationSlide[] =
       img.slides && img.slides.length > 0
         ? img.slides
-        : matchSchedule && matchSchedule.slides && matchSchedule.slides.length > 0
+        : matchSchedule && matchSchedule.slides.length > 0
           ? matchSchedule.slides
           : [
               {
@@ -555,7 +609,7 @@ export function HomePage({ app }: HomePageProps) {
     const deckSlides: PresentationSlide[] =
       img.slides && img.slides.length > 0
         ? img.slides
-        : matchSchedule && matchSchedule.slides && matchSchedule.slides.length > 0
+        : matchSchedule && matchSchedule.slides.length > 0
           ? matchSchedule.slides
           : [
               {
@@ -667,8 +721,40 @@ export function HomePage({ app }: HomePageProps) {
           <div className="hly-panel hly-panel--flex">
           {activeTab === 'music' && (
             <>
-              <div className="hly-panel__header">
-                <span className="hly-panel__title">♪ LISTA DE ALABANZAS ({filteredSongs.length})</span>
+              <div
+                className="hly-panel__header"
+                style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 4 }}
+              >
+                <span className="hly-panel__title" style={{ flex: 1 }}>
+                  ♪ LISTA DE ALABANZAS ({filteredSongs.length})
+                </span>
+                <input
+                  ref={songBatchInputRef}
+                  type="file"
+                  multiple
+                  accept=".mufl,.json,.hly,.xml,.txt"
+                  style={{ display: 'none' }}
+                  aria-label="Archivos de catálogo de alabanzas"
+                  onChange={(e) => void handleSongBatchSelected(e)}
+                />
+                <button
+                  type="button"
+                  className="hly-mini-btn"
+                  style={{ width: 26, height: 26, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                  title="Importar archivo con lote de letras (.mufl, .json, .hly, .xml, .txt)"
+                  onClick={() => songBatchInputRef.current?.click()}
+                >
+                  📥
+                </button>
+                <button
+                  type="button"
+                  className="hly-mini-btn hly-mini-btn--primary"
+                  style={{ width: 26, height: 26, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 900 }}
+                  title="Agregar una sola canción"
+                  onClick={openCreateSong}
+                >
+                  ➕
+                </button>
               </div>
               <div className="hly-SubToolbar">
                 <input
@@ -772,13 +858,13 @@ export function HomePage({ app }: HomePageProps) {
                     accept=".pdf,.pptx,.ppt,.ppsx,.pps,.potx"
                     multiple
                     style={{ display: 'none' }}
-                    onChange={handleUploadPresentationFile}
+                    onChange={(e) => void handleUploadPresentationFile(e)}
                   />
                   <button
                     type="button"
                     className="hly-mini-btn"
                     title="Abrir carpeta dedicada de diapositivas y presentaciones de la app"
-                    onClick={() => void app.openSlidesFolder?.()}
+                    onClick={() => void app.openSlidesFolder()}
                   >
                     📁
                   </button>
@@ -788,11 +874,12 @@ export function HomePage({ app }: HomePageProps) {
                     title="Recargar diapositivas desde la carpeta física"
                     aria-label="Recargar diapositivas desde la carpeta física"
                     disabled={isReloadingSlides}
-                    onClick={async () => {
+                    onClick={() => {
+                      void (async () => {
                       setIsReloadingSlides(true)
                       try {
                         // 1. Recargar y sincronizar presentaciones con los archivos de la carpeta
-                        const updated = (await app.reloadSlides?.()) || []
+                        const updated = await app.reloadSlides()
                         const validTitles = new Set(updated.map((p) => p.title.toLowerCase()))
 
                         // Cerrar pestañas abiertas de documentos que ya no existen
@@ -859,6 +946,7 @@ export function HomePage({ app }: HomePageProps) {
                       } finally {
                         setTimeout(() => setIsReloadingSlides(false), 300)
                       }
+                      })()
                     }}
                   >
                     <span style={{ display: 'inline-block', transform: isReloadingSlides ? 'rotate(360deg)' : 'none', transition: 'transform 0.5s ease' }}>🔄</span>
@@ -903,7 +991,7 @@ export function HomePage({ app }: HomePageProps) {
                     {filteredPresentations.map((item, idx) => {
                       const isSelected = selectedDocDeck?.id === item.id
                       const isLive = live?.deckTitle === item.title
-                      const firstThumb = item.slides?.[0]?.imageUrl
+                      const firstThumb = item.slides[0]?.imageUrl
                       return (
                         <div
                           key={item.id}
@@ -1028,7 +1116,7 @@ export function HomePage({ app }: HomePageProps) {
                                   itemType: 'presentación',
                                   onConfirm: () => {
                                     // 1. Eliminar de la base de datos persistente de presentaciones
-                                    const savedDeck = app.presentations?.find(
+                                    const savedDeck = app.presentations.find(
                                       (p) => p.id === item.id || p.title.toLowerCase() === item.title.toLowerCase()
                                     )
                                     if (savedDeck) {
@@ -1037,7 +1125,7 @@ export function HomePage({ app }: HomePageProps) {
                                       void app.deletePresentation(item.id)
                                     }
                                     // 2. Eliminar del cronograma si existía allí
-                                    const schedMatches = (app.schedule || []).filter(
+                                    const schedMatches = app.schedule.filter(
                                       (s) =>
                                         s.id === item.id ||
                                         s.title.toLowerCase() === item.title.toLowerCase() ||
@@ -1103,10 +1191,12 @@ export function HomePage({ app }: HomePageProps) {
                     type="button"
                     className="hly-mini-btn"
                     title="Recargar medios desde el almacenamiento local"
-                    onClick={async () => {
-                      setIsReloadingMedia(true)
-                      await app.reloadMedia()
-                      setTimeout(() => setIsReloadingMedia(false), 500)
+                    onClick={() => {
+                      void (async () => {
+                        setIsReloadingMedia(true)
+                        await app.reloadMedia()
+                        setTimeout(() => setIsReloadingMedia(false), 500)
+                      })()
                     }}
                   >
                     <span style={{ display: 'inline-block', transform: isReloadingMedia ? 'rotate(360deg)' : 'none', transition: 'transform 0.5s ease' }}>🔄</span>
@@ -1549,8 +1639,8 @@ export function HomePage({ app }: HomePageProps) {
         </div>
       )}
 
-      {/* Modal flotante de edición rápida de alabanza */}
-      {editingSong && (
+      {/* Modal flotante de edición / creación rápida de alabanza */}
+      {(editingSong || isCreatingSong) && (
         <div
           style={{
             position: 'fixed',
@@ -1562,7 +1652,7 @@ export function HomePage({ app }: HomePageProps) {
             justifyContent: 'center',
             padding: 20
           }}
-          onClick={() => setEditingSong(null)}
+          onClick={closeSongModal}
         >
           <div
             className="card"
@@ -1590,13 +1680,13 @@ export function HomePage({ app }: HomePageProps) {
               }}
             >
               <h2 style={{ margin: 0, fontSize: 18, color: '#f8fafc' }}>
-                ✏ Editar alabanza: {editingSong.title}
+                {editingSong ? `✏ Editar alabanza: ${editingSong.title}` : '➕ Nueva alabanza'}
               </h2>
               <button
                 type="button"
                 className="hly-icon-btn"
                 style={{ fontSize: 16, cursor: 'pointer' }}
-                onClick={() => setEditingSong(null)}
+                onClick={closeSongModal}
               >
                 ✕
               </button>
@@ -1718,7 +1808,7 @@ export function HomePage({ app }: HomePageProps) {
               <button
                 type="button"
                 className="btn btn--secondary"
-                onClick={() => setEditingSong(null)}
+                onClick={closeSongModal}
               >
                 Cancelar
               </button>
@@ -1727,7 +1817,7 @@ export function HomePage({ app }: HomePageProps) {
                 className="btn btn--primary"
                 onClick={() => void handleSaveEditedSong()}
               >
-                💾 Guardar cambios
+                {editingSong ? '💾 Guardar cambios' : '💾 Guardar alabanza'}
               </button>
             </div>
           </div>

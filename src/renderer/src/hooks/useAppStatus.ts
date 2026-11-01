@@ -5,6 +5,8 @@ import type {
   AppStatus,
   BibleBookSummary,
   BibleChapterRequest,
+  BibleVersionImportRequest,
+  BibleVersionInfo,
   BibleVerse,
   HolyricsImportItem,
   MediaBackground,
@@ -31,6 +33,7 @@ export interface UseAppStatus {
   schedule: ScheduleItem[]
   media: MediaBackground[]
   bibleBooks: BibleBookSummary[]
+  bibleVersions: BibleVersionInfo[]
   settings: AppSettings | null
   remoteInfo: RemoteServerInfo | null
   /** Mensaje de error de la última operación, si la hubo. */
@@ -54,7 +57,10 @@ export interface UseAppStatus {
   importHolyricsCatalog: (items: HolyricsImportItem[]) => Promise<void>
 
   getBibleChapter: (request: BibleChapterRequest) => Promise<BibleVerse[]>
-  searchBible: (query: string) => Promise<BibleVerse[]>
+  searchBible: (query: string, version?: string) => Promise<BibleVerse[]>
+  loadBibleBooks: (version?: string) => Promise<BibleBookSummary[]>
+  importBibleVersion: (request: BibleVersionImportRequest) => Promise<BibleVersionInfo[] | null>
+  deleteBibleVersion: (id: string) => Promise<BibleVersionInfo[] | null>
 
   addScheduleItem: (input: ScheduleItemInput) => Promise<void>
   removeScheduleItem: (id: string) => Promise<void>
@@ -97,6 +103,7 @@ export function useAppStatus(): UseAppStatus {
   const [media, setMedia] = useState<MediaBackground[]>([])
   const [presentations, setPresentations] = useState<PresentationDeck[]>([])
   const [bibleBooks, setBibleBooks] = useState<BibleBookSummary[]>([])
+  const [bibleVersions, setBibleVersions] = useState<BibleVersionInfo[]>([])
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [remoteInfo, setRemoteInfo] = useState<RemoteServerInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -138,6 +145,11 @@ export function useAppStatus(): UseAppStatus {
     if (typeof api.listBibleBooks === 'function') {
       void api.listBibleBooks().then((res) => {
         if (active) setBibleBooks(res)
+      })
+    }
+    if (typeof api.listBibleVersions === 'function') {
+      void api.listBibleVersions().then((res) => {
+        if (active) setBibleVersions(res)
       })
     }
     if (typeof api.getSettings === 'function') {
@@ -315,9 +327,59 @@ export function useAppStatus(): UseAppStatus {
   )
 
   const searchBible = useCallback(
-    async (query: string): Promise<BibleVerse[]> => {
+    async (query: string, version?: string): Promise<BibleVerse[]> => {
       if (!api || typeof api.searchBible !== 'function') return []
-      return await api.searchBible(query)
+      return await api.searchBible(query, version)
+    },
+    [api]
+  )
+
+  const loadBibleBooks = useCallback(
+    async (version?: string): Promise<BibleBookSummary[]> => {
+      if (!api || typeof api.listBibleBooks !== 'function') return []
+      const res = await api.listBibleBooks(version)
+      setBibleBooks(res)
+      return res
+    },
+    [api]
+  )
+
+  const importBibleVersion = useCallback(
+    async (request: BibleVersionImportRequest): Promise<BibleVersionInfo[] | null> => {
+      if (!api || typeof api.importBibleVersion !== 'function') return null
+      setBusy(true)
+      setError(null)
+      try {
+        const updated = await api.importBibleVersion(request)
+        setBibleVersions(updated)
+        setNotice(`Versión "${request.name}" importada correctamente.`)
+        return updated
+      } catch (err: unknown) {
+        setError(messageOf(err))
+        return null
+      } finally {
+        setBusy(false)
+      }
+    },
+    [api]
+  )
+
+  const deleteBibleVersion = useCallback(
+    async (id: string): Promise<BibleVersionInfo[] | null> => {
+      if (!api || typeof api.deleteBibleVersion !== 'function') return null
+      setBusy(true)
+      setError(null)
+      try {
+        const updated = await api.deleteBibleVersion(id)
+        setBibleVersions(updated)
+        setNotice('Versión eliminada.')
+        return updated
+      } catch (err: unknown) {
+        setError(messageOf(err))
+        return null
+      } finally {
+        setBusy(false)
+      }
     },
     [api]
   )
@@ -594,6 +656,7 @@ export function useAppStatus(): UseAppStatus {
     schedule,
     media,
     bibleBooks,
+    bibleVersions,
     settings,
     remoteInfo,
     error,
@@ -612,6 +675,9 @@ export function useAppStatus(): UseAppStatus {
     importHolyricsCatalog,
     getBibleChapter,
     searchBible,
+    loadBibleBooks,
+    importBibleVersion,
+    deleteBibleVersion,
     addScheduleItem,
     removeScheduleItem,
     moveScheduleItem,

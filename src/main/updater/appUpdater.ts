@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, type BrowserWindow, ipcMain } from 'electron'
 import { autoUpdater, type UpdateInfo } from 'electron-updater'
 
 export interface UpdateStatusState {
@@ -12,6 +12,10 @@ export interface UpdateStatusState {
 }
 
 let lastState: UpdateStatusState = { status: 'not-available' }
+
+function errorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error && err.message ? err.message : fallback
+}
 
 export function initAutoUpdater(getMainWindow: () => BrowserWindow | null): void {
   // Configuración de electron-updater
@@ -60,7 +64,7 @@ export function initAutoUpdater(getMainWindow: () => BrowserWindow | null): void
   })
 
   autoUpdater.on('error', (err) => {
-    const msg = err ? err.message : ''
+    const msg = err.message
     console.warn('[AutoUpdater] Error:', msg)
     // No molestar con popups si el release aún no está publicado o retorna 404 (ej. latest.yml inexistente)
     if (!msg.includes('404') && !msg.includes('latest.yml')) {
@@ -81,20 +85,20 @@ export function initAutoUpdater(getMainWindow: () => BrowserWindow | null): void
       // En modo desarrollo simulamos o intentamos comprobar si está configurado
       try {
         return await autoUpdater.checkForUpdates()
-      } catch (e: any) {
+      } catch (e) {
         broadcast({
           status: 'error',
-          error: 'Modo desarrollo: ' + (e?.message || 'No empaquetado')
+          error: 'Modo desarrollo: ' + errorMessage(e, 'No empaquetado')
         })
         return null
       }
     }
     try {
       return await autoUpdater.checkForUpdates()
-    } catch (e: any) {
+    } catch (e) {
       broadcast({
         status: 'error',
-        error: e?.message || 'Error al conectar con el servidor de actualizaciones'
+        error: errorMessage(e, 'Error al conectar con el servidor de actualizaciones')
       })
       return null
     }
@@ -104,10 +108,10 @@ export function initAutoUpdater(getMainWindow: () => BrowserWindow | null): void
     try {
       await autoUpdater.downloadUpdate()
       return true
-    } catch (e: any) {
+    } catch (e) {
       broadcast({
         status: 'error',
-        error: e?.message || 'Error al descargar la actualización'
+        error: errorMessage(e, 'Error al descargar la actualización')
       })
       return false
     }
