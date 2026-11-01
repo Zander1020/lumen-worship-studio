@@ -1,8 +1,8 @@
 # ESTADO ACTUAL Y MEMORIA DEL PROYECTO: LUMEN STUDIO
-**Fecha de corte:** 31 de Octubre de 2026 
-**Última versión publicada:** `v0.1.11` 
-**Repositorio GitHub:** [https://github.com/Zander1020/lumen-worship-studio](https://github.com/Zander1020/lumen-worship-studio) 
-**Release activo:** `v0.1.11` (incluye `Lumen-Studio-Setup-0.1.11.exe` y `Lumen-Studio-Setup-0.1.11.exe.blockmap`) 
+**Fecha de corte:** 31 de Octubre de 2026  
+**Última versión publicada:** `v0.1.11`  
+**Repositorio GitHub:** [https://github.com/Zander1020/lumen-worship-studio](https://github.com/Zander1020/lumen-worship-studio)  
+**Release activo:** `v0.1.11` (incluye `Lumen-Studio-Setup-0.1.11.exe` y `Lumen-Studio-Setup-0.1.11.exe.blockmap`)  
 **Rama principal:** `main` (al día con `origin/main` y tags `v0.1.8`, `v0.1.9`, `v0.1.10` y `v0.1.11`)
 
 ---
@@ -28,10 +28,10 @@
 ### Sincronización de Diapositivas con el Disco Físico (v0.1.9)
 - **Causa del problema previo:** Las diapositivas cargadas en versiones antiguas guardaban solo las imágenes generadas en el JSON del workspace (`lumen-workspace.json`) con `filePath: undefined`, sin copiar el archivo fuente a `AppData\Roaming\Lumen Studio\diapositivas`. Al presionar el botón 📁 de la app, la carpeta estaba vacía pero en la app seguían apareciendo elementos huérfanos.
 - **Comportamiento implementado en v0.1.9:**
- 1. **En 🔄 (`reloadSlides`):** La app compara cada presentación con los archivos existentes en la carpeta física `diapositivas\`. Si la carpeta está vacía o el archivo fue eliminado, la presentación se purga automáticamente de la base de datos y de la interfaz, cerrando pestañas de previsualización asociadas.
- 2. **Detección de nuevos archivos en carpeta:** Si el usuario coloca archivos `.pptx` o `.pdf` directamente en `diapositivas\`, al pulsar 🔄 se detectan (`scanSlidesFolderFiles`), se convierten y se añaden automáticamente al sistema.
- 3. **Al cargar (`+ Cargar Diapositiva / PDF`):** El archivo original se copia físicamente a `diapositivas\` y se enlaza con su ruta absoluta en disco.
- 4. **Al eliminar (✕):** Si el usuario confirma la eliminación con el modal de confirmación, se borra el registro de la app y el archivo físico de la carpeta `diapositivas\`.
+  1. **En 🔄 (`reloadSlides`):** La app compara cada presentación con los archivos existentes en la carpeta física `diapositivas\`. Si la carpeta está vacía o el archivo fue eliminado, la presentación se purga automáticamente de la base de datos y de la interfaz, cerrando pestañas de previsualización asociadas.
+  2. **Detección de nuevos archivos en carpeta:** Si el usuario coloca archivos `.pptx` o `.pdf` directamente en `diapositivas\`, al pulsar 🔄 se detectan (`scanSlidesFolderFiles`), se convierten y se añaden automáticamente al sistema.
+  3. **Al cargar (`+ Cargar Diapositiva / PDF`):** El archivo original se copia físicamente a `diapositivas\` y se enlaza con su ruta absoluta en disco.
+  4. **Al eliminar (✕):** Si el usuario confirma la eliminación con el modal de confirmación, se borra el registro de la app y el archivo físico de la carpeta `diapositivas\`.
 
 ### Alertas y Modales de Confirmación
 - Todos los botones de eliminar (✕) muestran el componente `ConfirmDeleteModal.tsx` con la estética oscura y moderna de la app antes de borrar cualquier elemento.
@@ -79,14 +79,14 @@
 
 ### Completadas en esta sesión
 1. **Biblia multi-versión con importación propia:**
- - Parser XML Zefania (`src/shared/bibleImport.ts`, formato Holyrics) con 6 tests.
- - `BibleRepository` multi-versión: 8 versiones con texto real incluido (RVR1960, RVR1909, NVI, DHH, LBLA, TLA, NTV, PDT), `listVersions`/`importVersion`/`deleteVersion`; versiones propias persistidas en `AppData\\Roaming\\Lumen Studio\\bible\\` (`versions.json` + `<id>.json`).
- - Importar XML (Zefania) o .xmm (Holyrics) con nombre de una versión clásica (o su abreviatura) **completa esa ranura** y la convierte en el texto real de esa versión (en lugar de crear una entrada duplicada).
- - `BiblePage`: selector de versión con optgroups (Clásicas / Mis versiones), versiones sin datos marcadas como "(sin datos)" y deshabilitadas con aviso + botón para importar; botón ➕ importar con modal, ✕ con `ConfirmDeleteModal`, búsqueda y proyección por versión.
- - API: `listBibleVersions`, `importBibleVersion`, `deleteBibleVersion`, `listBibleBooks(version)`, `searchBible(query, version)` (preload + `LumenApi` + validación IPC).
+   - Parser XML Zefania (`src/shared/bibleImport.ts`, formato Holyrics) con 6 tests.
+   - `BibleRepository` multi-versión: 8 versiones con texto real incluido (RVR1960, RVR1909, NVI, DHH, LBLA, TLA, NTV, PDT), `listVersions`/`importVersion`/`deleteVersion`; versiones propias persistidas en `AppData\\Roaming\\Lumen Studio\\bible\\` (`versions.json` + `<id>.json`).
+   - Importar XML (Zefania) o .xmm (Holyrics) con nombre de una versión clásica (o su abreviatura) **completa esa ranura** y la convierte en el texto real de esa versión (en lugar de crear una entrada duplicada).
+   - `BiblePage`: selector de versión con optgroups (Clásicas / Mis versiones), versiones sin datos marcadas como "(sin datos)" y deshabilitadas con aviso + botón para importar; botón ➕ importar con modal, ✕ con `ConfirmDeleteModal`, búsqueda y proyección por versión.
+   - API: `listBibleVersions`, `importBibleVersion`, `deleteBibleVersion`, `listBibleBooks(version)`, `searchBible(query, version)` (preload + `LumenApi` + validación IPC).
 2. **Editor gráfico — formato LUMEN:** la extensión de proyecto se renombró de `.lumen-design` a `.lumen`; botón "LUMEN (Editable)", selector de formato PNG/LUMEN, acepta `.lumen,.lumen-design,.json` al abrir, calidad oculta para png/lumen.
 3. **Pestaña MEDIOS retirada del `HolyricsLeftDock`:** el dock izquierdo quedó exclusivo del cronograma.
-4. **Limpieza total de ESLint:** de ~85 errores a **0** (`eslint --fix` + correcciones manuales: `any` tipos concretos, `unknown` en catches, condiciones redundantes de tipos, `queueMicrotask` para `set-state-in-effect`, extracción de `computeHolyricsOptimalFontSize` a `holyricsFontFit.ts` para `react-refresh`, `UpdateStatus` compartido en `src/shared/api.ts`).
+4. **Limpieza total de ESLint:** de ~85 errores a **0** (`eslint --fix` + correcciones manuales: `any`→tipos concretos, `unknown` en catches, condiciones redundantes de tipos, `queueMicrotask` para `set-state-in-effect`, extracción de `computeHolyricsOptimalFontSize` a `holyricsFontFit.ts` para `react-refresh`, `UpdateStatus` compartido en `src/shared/api.ts`).
 5. **Panel culto (HomePage, pestaña Medios):** cada fila muestra solo la miniatura (imagen o primer frame del vídeo) y el nombre del archivo; se eliminaron índice, subtítulo, categoría y botones por fila.
 
 ### Próximos pasos

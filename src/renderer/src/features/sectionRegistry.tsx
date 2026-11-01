@@ -17,26 +17,26 @@ import { SongsPage } from './songs/SongsPage'
  * propia carpeta dentro de `features/`.
  */
 export function renderSection(id: SectionId, app: UseAppStatus): ReactNode {
- switch (id) {
- case 'home':
- return <HomePage app={app} />
- case 'songs':
- return <SongsPage app={app} />
- case 'bible':
- return <BiblePage app={app} />
- case 'projection':
- return <ProjectionPage app={app} />
- case 'media':
- return <MediaPage app={app} />
- case 'design':
- return <GraphicEditorPage app={app} />
- case 'remote':
- return <RemoteControlPage app={app} />
- case 'ai':
- return <AiAssistantPage />
- case 'settings':
- return <SettingsPage app={app} />
- case 'about':
- return <AboutPage />
- }
+  switch (id) {
+    case 'home':
+      return <HomePage app={app} />
+    case 'songs':
+      return <SongsPage app={app} />
+    case 'bible':
+      return <BiblePage app={app} />
+    case 'projection':
+      return <ProjectionPage app={app} />
+    case 'media':
+      return <MediaPage app={app} />
+    case 'design':
+      return <GraphicEditorPage app={app} />
+    case 'remote':
+      return <RemoteControlPage app={app} />
+    case 'ai':
+      return <AiAssistantPage />
+    case 'settings':
+      return <SettingsPage app={app} />
+    case 'about':
+      return <AboutPage />
+  }
 }
