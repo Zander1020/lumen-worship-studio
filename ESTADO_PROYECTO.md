@@ -2,7 +2,7 @@
 **Fecha de corte:** 31 de Octubre de 2026  
 **Última versión publicada:** `v0.1.11`  
 **Repositorio GitHub:** [https://github.com/Zander1020/lumen-worship-studio](https://github.com/Zander1020/lumen-worship-studio)  
-**Release activo:** `v0.1.11` (incluye `Lumen-Studio-Setup-0.1.11.exe` y `Lumen-Studio-Setup-0.1.11.exe.blockmap`) (pendiente de publicación)  
+**Release activo:** `v0.1.11` (incluye `Lumen-Studio-Setup-0.1.11.exe` y `Lumen-Studio-Setup-0.1.11.exe.blockmap`)  
 **Rama principal:** `main` (al día con `origin/main` y tags `v0.1.8`, `v0.1.9`, `v0.1.10` y `v0.1.11`)
 
 ---
