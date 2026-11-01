@@ -144,7 +144,7 @@ export function HolyricsLeftDock({ app }: HolyricsLeftDockProps) {
             </div>
           ) : (
             <div className="hly-table-list" role="list">
-              {filteredSchedule.map((item, idx) => {
+              {filteredSchedule.map((item) => {
                 const isActive = live?.deckTitle === item.title
                 const isPresentation =
                   item.title.toLowerCase().includes('pdf') ||
@@ -156,71 +156,62 @@ export function HolyricsLeftDock({ app }: HolyricsLeftDockProps) {
                     role="listitem"
                     className={`hly-playlist-row${isActive ? ' hly-playlist-row--active' : ''}`}
                     style={{ cursor: 'pointer' }}
+                    title={item.title}
+                    onClick={() => projectScheduleItem(item, true)}
                   >
+                    <div
+                      style={{
+                        width: 40,
+                        height: 28,
+                        borderRadius: 4,
+                        overflow: 'hidden',
+                        background: '#0a0e17',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        border: '1px solid var(--border)',
+                        position: 'relative'
+                      }}
+                    >
+                      {(() => {
+                        const thumb = item.slides[0]?.imageUrl
+                        if (thumb && (thumb.startsWith('data:image') || thumb.startsWith('http') || thumb.startsWith('lumen-media:'))) {
+                          return (
+                            <img
+                              src={thumb}
+                              alt=""
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              onError={(e) => { e.currentTarget.style.display = 'none' }}
+                            />
+                          )
+                        }
+                        return <span style={{ fontSize: 12 }}>{isPresentation ? (item.title.toLowerCase().includes('pdf') ? '📄' : '📊') : item.kind === 'song' ? '🎵' : item.kind === 'bible' ? '📖' : '🖼'}</span>
+                      })()}
+                    </div>
+                    <span className="hly-playlist-row__title" style={{ fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
+                      {item.title}
+                    </span>
                     <button
                       type="button"
-                      className="hly-playlist-row__main"
-                      title="1 clic: Proyectar todas las diapositivas · Teclas flecha para cambiar"
-                      onClick={() => projectScheduleItem(item, true)}
-                      onDoubleClick={() => projectScheduleItem(item, true)}
+                      className="hly-icon-btn hly-icon-btn--danger"
+                      title="Quitar del cronograma"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setDeleteConfirm({
+                          isOpen: true,
+                          title: '¿Quitar del orden del culto?',
+                          itemName: item.title,
+                          itemType: 'elemento',
+                          onConfirm: () => {
+                            void app.removeScheduleItem(item.id)
+                            setDeleteConfirm((prev) => ({ ...prev, isOpen: false }))
+                          }
+                        })
+                      }}
                     >
-                      <span className="hly-playlist-row__idx">
-                        {String(idx + 1).padStart(2, '0')}
-                      </span>
-                      <span
-                        style={{
-                          width: 28,
-                          height: 20,
-                          borderRadius: 3,
-                          overflow: 'hidden',
-                          background: '#1a2234',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                          border: '1px solid var(--border)',
-                          fontSize: 11
-                        }}
-                      >
-                        {isPresentation ? (item.title.toLowerCase().includes('pdf') ? '📄' : '📊') : item.kind === 'song' ? '♪' : item.kind === 'bible' ? '📖' : '📢'}
-                      </span>
-                      <span className="hly-playlist-row__info">
-                        <span className="hly-playlist-row__title">{item.title}</span>
-                        <span className="hly-playlist-row__sub">
-                          {item.subtitle || `${item.slides.length} diapositivas`}
-                        </span>
-                      </span>
+                      ✕
                     </button>
-                    <div className="hly-playlist-row__actions">
-                      <button
-                        type="button"
-                        className="hly-icon-btn"
-                        title="Proyectar en vivo (doble clic)"
-                        onClick={() => projectScheduleItem(item, true)}
-                      >
-                        ▶
-                      </button>
-                      <button
-                        type="button"
-                        className="hly-icon-btn hly-icon-btn--danger"
-                        title="Quitar del cronograma"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setDeleteConfirm({
-                            isOpen: true,
-                            title: '¿Quitar del orden del culto?',
-                            itemName: item.title,
-                            itemType: 'elemento',
-                            onConfirm: () => {
-                              void app.removeScheduleItem(item.id)
-                              setDeleteConfirm((prev) => ({ ...prev, isOpen: false }))
-                            }
-                          })
-                        }}
-                      >
-                        ✕
-                      </button>
-                    </div>
                   </div>
                 )
               })}
