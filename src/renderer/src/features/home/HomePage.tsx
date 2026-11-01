@@ -30,9 +30,9 @@ function stanzaTagClass(label: string): string {
 }
 
 /**
- * Mesa Principal de Operaci├│n id├®ntica a la ventana central de Holyrics:
- * - Izquierda: Cat├ílogo r├ípido con pesta├▒as (M├║sica, Biblia 66 libros, Presentaciones PDF/PPTX, Im├ígenes del Culto, Texto/Alerta r├ípida).
- * - Derecha: Barra de pesta├▒as de documentos abiertos + Tabla numerada de P├írrafos / Vers├¡culos / Diapositivas en Previsualizaci├│n.
+ * Mesa Principal de Operación idéntica a la ventana central de Holyrics:
+ * - Izquierda: Catálogo rápido con pestañas (Música, Biblia 66 libros, Presentaciones PDF/PPTX, Imágenes del Culto, Texto/Alerta rápida).
+ * - Derecha: Barra de pestañas de documentos abiertos + Tabla numerada de Párrafos / Versículos / Diapositivas en Previsualización.
  */
 export function HomePage({ app }: HomePageProps) {
   const [activeTab, setActiveTab] = useState<QuickTab>('music')
@@ -96,7 +96,7 @@ export function HomePage({ app }: HomePageProps) {
             void app.savePresentation({
               id: `pdf-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               title: deck.title,
-              subtitle: `${deck.slides.length} p├íginas ┬À PDF`,
+              subtitle: `${deck.slides.length} páginas · PDF`,
               kind: 'pdf',
               filePath: nativePath || undefined,
               fileData,
@@ -128,7 +128,7 @@ export function HomePage({ app }: HomePageProps) {
             void app.savePresentation({
               id: `pptx-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               title: deck.title,
-              subtitle: `${deck.slides.length} diapositivas ┬À PowerPoint`,
+              subtitle: `${deck.slides.length} diapositivas · PowerPoint`,
               kind: 'pptx',
               filePath: nativePath || undefined,
               fileData,
@@ -155,7 +155,7 @@ export function HomePage({ app }: HomePageProps) {
   const handleUploadMediaFiles = (e: ChangeEvent<HTMLInputElement>): void => {
     const files = Array.from(e.target.files ?? [])
     files.forEach((file) => {
-      // Bloqueo total: Si es PDF o PowerPoint, jam├ís se a├▒ade a Medios (solo a Diapositivas)
+      // Bloqueo total: Si es PDF o PowerPoint, jamás se añade a Medios (solo a Diapositivas)
       if (
         /\.(pdf|pptx|ppt|ppsx|pps|potx)$/i.test(file.name) ||
         file.type.includes('pdf') ||
@@ -203,10 +203,10 @@ export function HomePage({ app }: HomePageProps) {
     e.target.value = ''
   }
 
-  // Men├║ contextual clic derecho en canciones
+  // Menú contextual clic derecho en canciones
   const [contextMenu, setContextMenu] = useState<{ song: Song; x: number; y: number } | null>(null)
 
-  // Estado de edici├│n r├ípida de alabanza (clic derecho -> Editar alabanza)
+  // Estado de edición rápida de alabanza (clic derecho -> Editar alabanza)
   const [editingSong, setEditingSong] = useState<Song | null>(null)
   const [isCreatingSong, setIsCreatingSong] = useState(false)
   const [editTitle, setEditTitle] = useState('')
@@ -249,7 +249,7 @@ export function HomePage({ app }: HomePageProps) {
       ...(editingSong ? { id: editingSong.id, tags: editingSong.tags } : { tags: ['Alabanza'] }),
       title: editTitle.trim(),
       author: editAuthor.trim(),
-      musicalKey: editKey.trim() || 'ÔÇö',
+      musicalKey: editKey.trim() || '—',
       bpm: editBpm ?? null,
       stanzas
     })
@@ -289,13 +289,13 @@ export function HomePage({ app }: HomePageProps) {
     e.target.value = ''
   }
 
-  // Opci├│n para mostrar u ocultar la columna de etiquetas en la tabla de diapositivas
+  // Opción para mostrar u ocultar la columna de etiquetas en la tabla de diapositivas
   const [showTagsColumn, setShowTagsColumn] = useState(false)
 
-  // Estado de Texto / Alerta r├ípida estilo Holyrics
+  // Estado de Texto / Alerta rápida estilo Holyrics
   const [isReloadingMedia, setIsReloadingMedia] = useState(false)
-  const [quickTitle, setQuickTitle] = useState('Bienvenidos al Servicio de Adoraci├│n')
-  const [quickBody, setQuickBody] = useState('Dios bendiga tu vida y tu familia en este d├¡a.')
+  const [quickTitle, setQuickTitle] = useState('Bienvenidos al Servicio de Adoración')
+  const [quickBody, setQuickBody] = useState('Dios bendiga tu vida y tu familia en este día.')
   const [quickFooter, setQuickFooter] = useState('Lumen Worship Studio')
 
   useEffect(() => {
@@ -339,7 +339,7 @@ export function HomePage({ app }: HomePageProps) {
   }
 
   const churchMedia = useMemo(() => {
-    // En la vista Medios s├│lo deben salir v├¡deos e im├ígenes de culto (excluyendo fondos y presentaciones)
+    // En la vista Medios sólo deben salir vídeos e imágenes de culto (excluyendo fondos y presentaciones)
     return app.media.filter(
       (m) => m.category === 'Culto' && !isDoc(m)
     )
@@ -371,7 +371,7 @@ export function HomePage({ app }: HomePageProps) {
     setOpenDocTabs((prev) => prev.filter((d) => d.id !== tabId && d.title !== tabId))
   }
 
-  // Recopilar presentaciones disponibles (almac├®n persistente de diapositivas)
+  // Recopilar presentaciones disponibles (almacén persistente de diapositivas)
   const presentationDecks = useMemo(() => {
     const list: Array<{ id: string; title: string; subtitle: string; slides: PresentationSlide[]; kind: 'pdf' | 'pptx' }> = []
     const seenTitles = new Set<string>()
@@ -384,7 +384,7 @@ export function HomePage({ app }: HomePageProps) {
         list.push({
           id: p.id,
           title: p.title,
-          subtitle: p.subtitle || `${p.slides.length} diapositivas / p├íginas`,
+          subtitle: p.subtitle || `${p.slides.length} diapositivas / páginas`,
           slides: p.slides,
           kind: p.kind
         })
@@ -439,11 +439,11 @@ export function HomePage({ app }: HomePageProps) {
     }
   }, [live?.currentIndex, live?.deckTitle])
 
-  // Si se proyecta o carga un documento desde el dock o el cronograma, abrir su pesta├▒a y seleccionarlo
+  // Si se proyecta o carga un documento desde el dock o el cronograma, abrir su pestaña y seleccionarlo
   useEffect(() => {
     if (!live?.deckTitle || live.slides.length <= 1) return
     const isDoc =
-      live.slides.some((s) => s.label.toLowerCase().includes('p├ígina') || s.label.toLowerCase().includes('diapositiva')) ||
+      live.slides.some((s) => s.label.toLowerCase().includes('página') || s.label.toLowerCase().includes('diapositiva')) ||
       live.deckTitle.toLowerCase().includes('pdf') ||
       live.deckTitle.toLowerCase().includes('powerpoint') ||
       live.deckTitle.toLowerCase().includes('presentaci')
@@ -468,18 +468,18 @@ export function HomePage({ app }: HomePageProps) {
     activeTab === 'music'
       ? selectedSong?.title ?? 'Sin alabanza seleccionada'
       : activeTab === 'presentation'
-        ? selectedDocDeck?.title ?? 'Sin presentaci├│n seleccionada'
+        ? selectedDocDeck?.title ?? 'Sin presentación seleccionada'
         : activeTab === 'images'
-          ? (selectedMedia ? `${selectedMedia.kind === 'video' || isVideoUrl(selectedMedia.value) ? 'V├¡deo' : 'Imagen'}: ${selectedMedia.name}` : 'Sin medio seleccionado')
-          : quickTitle || 'Anuncio r├ípido'
+          ? (selectedMedia ? `${selectedMedia.kind === 'video' || isVideoUrl(selectedMedia.value) ? 'Vídeo' : 'Imagen'}: ${selectedMedia.name}` : 'Sin medio seleccionado')
+          : quickTitle || 'Anuncio rápido'
 
   const previewSub =
     activeTab === 'music'
-      ? `${selectedSong?.author || 'Autor desconocido'} ┬À Tono: ${selectedSong?.musicalKey || 'ÔÇö'}`
+      ? `${selectedSong?.author || 'Autor desconocido'} · Tono: ${selectedSong?.musicalKey || '—'}`
       : activeTab === 'presentation'
-        ? `${selectedDocDeck?.slides.length ?? 0} diapositivas / p├íginas`
+        ? `${selectedDocDeck?.slides.length ?? 0} diapositivas / páginas`
         : activeTab === 'images'
-          ? (selectedMedia?.category || (selectedMedia?.kind === 'video' || isVideoUrl(selectedMedia?.value) ? 'V├¡deo a Pantalla Completa' : 'Imagen a Pantalla Completa'))
+          ? (selectedMedia?.category || (selectedMedia?.kind === 'video' || isVideoUrl(selectedMedia?.value) ? 'Vídeo a Pantalla Completa' : 'Imagen a Pantalla Completa'))
           : 'Texto / Alerta en vivo'
 
   const previewSlides: PresentationSlide[] = useMemo(() => {
@@ -580,7 +580,7 @@ export function HomePage({ app }: HomePageProps) {
             ]
 
     void app.loadProjectionDeck({
-      deckTitle: `${isVid ? 'V├¡deo' : 'Imagen'}: ${img.name}`,
+      deckTitle: `${isVid ? 'Vídeo' : 'Imagen'}: ${img.name}`,
       slides: deckSlides,
       startIndex: 0,
       openWindow
@@ -632,8 +632,8 @@ export function HomePage({ app }: HomePageProps) {
       ? img.name.toLowerCase().includes('pdf')
         ? `PDF: ${img.name}`
         : `PowerPoint: ${img.name}`
-      : `${isVid ? 'V├¡deo' : 'Imagen'}: ${img.name}`
-    const subtitle = deckSlides.length > 1 ? `${deckSlides.length} diapositivas` : isVid ? 'V├¡deo del culto' : 'Imagen del culto'
+      : `${isVid ? 'Vídeo' : 'Imagen'}: ${img.name}`
+    const subtitle = deckSlides.length > 1 ? `${deckSlides.length} diapositivas` : isVid ? 'Vídeo del culto' : 'Imagen del culto'
 
     void app.addScheduleItem({
       kind: 'announcement',
@@ -663,7 +663,7 @@ export function HomePage({ app }: HomePageProps) {
               className={`hly-tab-btn${activeTab === 'music' ? ' hly-tab-btn--active' : ''}`}
               onClick={() => setActiveTab('music')}
             >
-              ÔÖ¬ M├║sica (<span data-testid="home-song-count">{app.songs.length}</span>)
+              ♪ Música (<span data-testid="home-song-count">{app.songs.length}</span>)
             </button>
             <button
               type="button"
@@ -672,7 +672,7 @@ export function HomePage({ app }: HomePageProps) {
               className={`hly-tab-btn${activeTab === 'bible' ? ' hly-tab-btn--active' : ''}`}
               onClick={() => setActiveTab('bible')}
             >
-              ­ƒôû Biblia ({app.bibleBooks.length || 66})
+              📖 Biblia ({app.bibleBooks.length || 66})
             </button>
             <button
               type="button"
@@ -681,7 +681,7 @@ export function HomePage({ app }: HomePageProps) {
               className={`hly-tab-btn${activeTab === 'presentation' ? ' hly-tab-btn--active' : ''}`}
               onClick={() => setActiveTab('presentation')}
             >
-              ­ƒôä Diapositivas / PDF ({presentationDecks.length})
+              📄 Diapositivas / PDF ({presentationDecks.length})
             </button>
             <button
               type="button"
@@ -690,7 +690,7 @@ export function HomePage({ app }: HomePageProps) {
               className={`hly-tab-btn${activeTab === 'images' ? ' hly-tab-btn--active' : ''}`}
               onClick={() => setActiveTab('images')}
             >
-              ­ƒÄ¼ Medios ({churchMedia.length})
+              🎬 Medios ({churchMedia.length})
             </button>
             <button
               type="button"
@@ -699,7 +699,7 @@ export function HomePage({ app }: HomePageProps) {
               className={`hly-tab-btn${activeTab === 'text' ? ' hly-tab-btn--active' : ''}`}
               onClick={() => setActiveTab('text')}
             >
-              ­ƒôó Texto R├ípido
+              📢 Texto Rápido
             </button>
           </div>
         </div>
@@ -707,7 +707,7 @@ export function HomePage({ app }: HomePageProps) {
 
       {!app.bridgeAvailable && (
         <div className="card card--warn" role="alert">
-          No se detect├│ la conexi├│n con el proceso principal. Ejecuta la aplicaci├│n con Electron.
+          No se detectó la conexión con el proceso principal. Ejecuta la aplicación con Electron.
         </div>
       )}
 
@@ -717,7 +717,7 @@ export function HomePage({ app }: HomePageProps) {
         </div>
       ) : (
         <div className="hly-center-split">
-          {/* PANEL CENTRAL IZQUIERDO: CAT├üLOGO / SELECTOR */}
+          {/* PANEL CENTRAL IZQUIERDO: CATÁLOGO / SELECTOR */}
           <div className="hly-panel hly-panel--flex">
           {activeTab === 'music' && (
             <>
@@ -726,7 +726,7 @@ export function HomePage({ app }: HomePageProps) {
                 style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 4 }}
               >
                 <span className="hly-panel__title" style={{ flex: 1 }}>
-                  ÔÖ¬ LISTA DE ALABANZAS ({filteredSongs.length})
+                  ♪ LISTA DE ALABANZAS ({filteredSongs.length})
                 </span>
                 <input
                   ref={songBatchInputRef}
@@ -734,7 +734,7 @@ export function HomePage({ app }: HomePageProps) {
                   multiple
                   accept=".mufl,.json,.hly,.xml,.txt"
                   style={{ display: 'none' }}
-                  aria-label="Archivos de cat├ílogo de alabanzas"
+                  aria-label="Archivos de catálogo de alabanzas"
                   onChange={(e) => void handleSongBatchSelected(e)}
                 />
                 <button
@@ -744,16 +744,16 @@ export function HomePage({ app }: HomePageProps) {
                   title="Importar archivo con lote de letras (.mufl, .json, .hly, .xml, .txt)"
                   onClick={() => songBatchInputRef.current?.click()}
                 >
-                  ­ƒôÑ
+                  📥
                 </button>
                 <button
                   type="button"
                   className="hly-mini-btn hly-mini-btn--primary"
                   style={{ width: 26, height: 26, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 900 }}
-                  title="Agregar una sola canci├│n"
+                  title="Agregar una sola canción"
                   onClick={openCreateSong}
                 >
-                  Ô×ò
+                  ➕
                 </button>
               </div>
               <div className="hly-SubToolbar">
@@ -762,15 +762,15 @@ export function HomePage({ app }: HomePageProps) {
                   className="input"
                   value={songQuery}
                   onChange={(e) => setSongQuery(e.target.value)}
-                  placeholder="Filtrar por t├¡tulo, letra, artista o tonalidad..."
+                  placeholder="Filtrar por título, letra, artista o tonalidad..."
                   aria-label="Filtrar alabanzas en consola"
                 />
               </div>
               <div className="hly-grid-header hly-grid-header--songs" aria-hidden="true">
-                <span>T├¡tulo</span>
+                <span>Título</span>
                 <span>Autor / Artista</span>
                 <span>Tono</span>
-                <span>Acci├│n</span>
+                <span>Acción</span>
               </div>
               <div className="hly-scroll-area" role="list">
                 {filteredSongs.map((song) => {
@@ -801,22 +801,22 @@ export function HomePage({ app }: HomePageProps) {
                         }}
                       >
                         <span className="hly-song-grid-row__title">{song.title}</span>
-                        <span className="hly-song-grid-row__author">{song.author || 'ÔÇö'}</span>
-                        <span className="hly-song-grid-row__key">{song.musicalKey || 'ÔÇö'}</span>
+                        <span className="hly-song-grid-row__author">{song.author || '—'}</span>
+                        <span className="hly-song-grid-row__key">{song.musicalKey || '—'}</span>
                       </button>
                       <div className="hly-song-grid-row__actions">
                         <button
                           type="button"
                           className="hly-icon-btn"
-                          title="Enviar directo a proyecci├│n en vivo"
+                          title="Enviar directo a proyección en vivo"
                           onClick={() => projectSongImmediately(song, true)}
                         >
-                          ÔûÂ
+                          ▶
                         </button>
                         <button
                           type="button"
                           className="hly-icon-btn"
-                          title="A├▒adir a la Lista de Reproducci├│n"
+                          title="Añadir a la Lista de Reproducción"
                           onClick={() =>
                             void app.addScheduleItem({
                               kind: 'song',
@@ -850,7 +850,7 @@ export function HomePage({ app }: HomePageProps) {
                   padding: '6px 8px'
                 }}
               >
-                <span className="hly-panel__title">­ƒôä DIAPOSITIVAS Y PRESENTACIONES ({filteredPresentations.length})</span>
+                <span className="hly-panel__title">📄 DIAPOSITIVAS Y PRESENTACIONES ({filteredPresentations.length})</span>
                 <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                   <input
                     ref={presentationFileInputRef}
@@ -866,13 +866,13 @@ export function HomePage({ app }: HomePageProps) {
                     title="Abrir carpeta dedicada de diapositivas y presentaciones de la app"
                     onClick={() => void app.openSlidesFolder()}
                   >
-                    ­ƒôü
+                    📁
                   </button>
                   <button
                     type="button"
                     className="hly-mini-btn"
-                    title="Recargar diapositivas desde la carpeta f├¡sica"
-                    aria-label="Recargar diapositivas desde la carpeta f├¡sica"
+                    title="Recargar diapositivas desde la carpeta física"
+                    aria-label="Recargar diapositivas desde la carpeta física"
                     disabled={isReloadingSlides}
                     onClick={() => {
                       void (async () => {
@@ -882,7 +882,7 @@ export function HomePage({ app }: HomePageProps) {
                         const updated = await app.reloadSlides()
                         const validTitles = new Set(updated.map((p) => p.title.toLowerCase()))
 
-                        // Cerrar pesta├▒as abiertas de documentos que ya no existen
+                        // Cerrar pestañas abiertas de documentos que ya no existen
                         setOpenDocTabs((prev) =>
                           prev.filter((d) => validTitles.has(d.title.toLowerCase()))
                         )
@@ -915,7 +915,7 @@ export function HomePage({ app }: HomePageProps) {
                                       await app.savePresentation({
                                         id: `pdf-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                                         title: deck.title,
-                                        subtitle: `${deck.slides.length} p├íginas ┬À PDF`,
+                                        subtitle: `${deck.slides.length} páginas · PDF`,
                                         kind: 'pdf',
                                         filePath: fileInfo.filePath,
                                         slides: deck.slides
@@ -928,7 +928,7 @@ export function HomePage({ app }: HomePageProps) {
                                       await app.savePresentation({
                                         id: `pptx-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                                         title: deck.title,
-                                        subtitle: `${deck.slides.length} diapositivas ┬À PowerPoint`,
+                                        subtitle: `${deck.slides.length} diapositivas · PowerPoint`,
                                         kind: 'pptx',
                                         filePath: fileInfo.filePath,
                                         slides: deck.slides
@@ -949,16 +949,16 @@ export function HomePage({ app }: HomePageProps) {
                       })()
                     }}
                   >
-                    <span style={{ display: 'inline-block', transform: isReloadingSlides ? 'rotate(360deg)' : 'none', transition: 'transform 0.5s ease' }}>­ƒöä</span>
+                    <span style={{ display: 'inline-block', transform: isReloadingSlides ? 'rotate(360deg)' : 'none', transition: 'transform 0.5s ease' }}>🔄</span>
                   </button>
                   <button
                     type="button"
                     className="hly-mini-btn hly-mini-btn--primary"
                     style={{ fontSize: 11, padding: '3px 8px', fontWeight: 700 }}
-                    title="Cargar presentaci├│n de PowerPoint (.pptx) o archivo PDF"
+                    title="Cargar presentación de PowerPoint (.pptx) o archivo PDF"
                     onClick={() => presentationFileInputRef.current?.click()}
                   >
-                    Ô×ò Cargar Diapositiva / PDF
+                    ➕ Cargar Diapositiva / PDF
                   </button>
                 </div>
               </div>
@@ -968,7 +968,7 @@ export function HomePage({ app }: HomePageProps) {
                   className="input"
                   value={presentationSearch}
                   onChange={(e) => setPresentationSearch(e.target.value)}
-                  placeholder="Filtrar presentaciones por t├¡tulo..."
+                  placeholder="Filtrar presentaciones por título..."
                   aria-label="Filtrar presentaciones y diapositivas"
                 />
               </div>
@@ -983,7 +983,7 @@ export function HomePage({ app }: HomePageProps) {
                       className="button button--primary"
                       onClick={() => presentationFileInputRef.current?.click()}
                     >
-                      Ô×ò Cargar PowerPoint (.pptx) o PDF
+                      ➕ Cargar PowerPoint (.pptx) o PDF
                     </button>
                   </div>
                 ) : (
@@ -1038,7 +1038,7 @@ export function HomePage({ app }: HomePageProps) {
                                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                 />
                               ) : (
-                                <span style={{ fontSize: 15 }}>{item.kind === 'pdf' ? '­ƒôä' : '­ƒôè'}</span>
+                                <span style={{ fontSize: 15 }}>{item.kind === 'pdf' ? '📄' : '📊'}</span>
                               )}
                             </div>
                             <div className="hly-playlist-row__info" style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
@@ -1046,7 +1046,7 @@ export function HomePage({ app }: HomePageProps) {
                                 {item.title}
                               </span>
                               <span className="hly-playlist-row__sub" style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                                {item.subtitle} ┬À {item.kind === 'pdf' ? 'PDF' : 'PowerPoint'}
+                                {item.subtitle} · {item.kind === 'pdf' ? 'PDF' : 'PowerPoint'}
                               </span>
                             </div>
                           </div>
@@ -1055,7 +1055,7 @@ export function HomePage({ app }: HomePageProps) {
                             <button
                               type="button"
                               className="hly-icon-btn"
-                              title="A├▒adir al orden del culto"
+                              title="Añadir al orden del culto"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 void app.addScheduleItem({
@@ -1066,7 +1066,7 @@ export function HomePage({ app }: HomePageProps) {
                                 })
                               }}
                             >
-                              Ô×ò
+                              ➕
                             </button>
                             <button
                               type="button"
@@ -1090,7 +1090,7 @@ export function HomePage({ app }: HomePageProps) {
                                 })
                               }}
                             >
-                              ­ƒæü
+                              👁
                             </button>
                             <button
                               type="button"
@@ -1101,19 +1101,19 @@ export function HomePage({ app }: HomePageProps) {
                                 projectPresentationImmediately(item, true)
                               }}
                             >
-                              ÔûÂ
+                              ▶
                             </button>
                             <button
                               type="button"
                               className="hly-icon-btn hly-icon-btn--danger"
-                              title="Eliminar presentaci├│n"
+                              title="Eliminar presentación"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 setDeleteConfirm({
                                   isOpen: true,
-                                  title: '┬┐Eliminar presentaci├│n de diapositivas?',
+                                  title: '¿Eliminar presentación de diapositivas?',
                                   itemName: item.title,
-                                  itemType: 'presentaci├│n',
+                                  itemType: 'presentación',
                                   onConfirm: () => {
                                     // 1. Eliminar de la base de datos persistente de presentaciones
                                     const savedDeck = app.presentations.find(
@@ -1124,7 +1124,7 @@ export function HomePage({ app }: HomePageProps) {
                                     } else {
                                       void app.deletePresentation(item.id)
                                     }
-                                    // 2. Eliminar del cronograma si exist├¡a all├¡
+                                    // 2. Eliminar del cronograma si existía allí
                                     const schedMatches = app.schedule.filter(
                                       (s) =>
                                         s.id === item.id ||
@@ -1135,7 +1135,7 @@ export function HomePage({ app }: HomePageProps) {
                                     for (const sm of schedMatches) {
                                       void app.removeScheduleItem(sm.id)
                                     }
-                                    // 3. Cerrar pesta├▒as abiertas del documento
+                                    // 3. Cerrar pestañas abiertas del documento
                                     setOpenDocTabs((prev) => prev.filter((d) => d.id !== item.id && d.title.toLowerCase() !== item.title.toLowerCase()))
                                     if (selectedDocId === item.id || selectedDocId?.toLowerCase() === item.title.toLowerCase()) {
                                       setSelectedDocId(null)
@@ -1145,7 +1145,7 @@ export function HomePage({ app }: HomePageProps) {
                                 })
                               }}
                             >
-                              Ô£ò
+                              ✕
                             </button>
                           </div>
                         </div>
@@ -1169,7 +1169,7 @@ export function HomePage({ app }: HomePageProps) {
                   padding: '6px 8px'
                 }}
               >
-                <span className="hly-panel__title">­ƒÄ¼ MEDIOS ({filteredMedia.length})</span>
+                <span className="hly-panel__title">🎬 MEDIOS ({filteredMedia.length})</span>
                 <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                   <input
                     ref={homeMediaInputRef}
@@ -1182,10 +1182,10 @@ export function HomePage({ app }: HomePageProps) {
                   <button
                     type="button"
                     className="hly-mini-btn"
-                    title="Abrir carpeta dedicada de im├ígenes y v├¡deos de la app"
+                    title="Abrir carpeta dedicada de imágenes y vídeos de la app"
                     onClick={() => void app.openMediaFolder()}
                   >
-                    ­ƒôü
+                    📁
                   </button>
                   <button
                     type="button"
@@ -1199,13 +1199,13 @@ export function HomePage({ app }: HomePageProps) {
                       })()
                     }}
                   >
-                    <span style={{ display: 'inline-block', transform: isReloadingMedia ? 'rotate(360deg)' : 'none', transition: 'transform 0.5s ease' }}>­ƒöä</span>
+                    <span style={{ display: 'inline-block', transform: isReloadingMedia ? 'rotate(360deg)' : 'none', transition: 'transform 0.5s ease' }}>🔄</span>
                   </button>
                   <button
                     type="button"
                     className="hly-mini-btn hly-mini-btn--primary"
                     style={{ fontWeight: 700 }}
-                    title="A├▒adir im├ígenes o v├¡deos del culto"
+                    title="Añadir imágenes o vídeos del culto"
                     onClick={() => homeMediaInputRef.current?.click()}
                   >
                     + Importar
@@ -1218,21 +1218,21 @@ export function HomePage({ app }: HomePageProps) {
                   className="input"
                   value={imageSearch}
                   onChange={(e) => setImageSearch(e.target.value)}
-                  placeholder="Filtrar por nombre de imagen o v├¡deo..."
+                  placeholder="Filtrar por nombre de imagen o vídeo..."
                   aria-label="Filtrar medios del culto"
                 />
               </div>
               <div className="hly-scroll-area" role="list">
                 {filteredMedia.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)' }}>
-                    No hay medios registrados. Usa <strong>­ƒôü</strong> para abrir la carpeta o <strong>+ Importar</strong> para subirlos.
+                    No hay medios registrados. Usa <strong>📁</strong> para abrir la carpeta o <strong>+ Importar</strong> para subirlos.
                   </div>
                 ) : (
                   <div className="hly-table-list" role="list" style={{ padding: '4px 6px' }}>
                     {filteredMedia.map((m, idx) => {
                       const isSelected = selectedMedia?.id === m.id
                       const isVid = m.kind === 'video' || isVideoUrl(m.value)
-                      const isLive = live?.deckTitle === `${isVid ? 'V├¡deo' : 'Imagen'}: ${m.name}` || live?.deckTitle === m.name
+                      const isLive = live?.deckTitle === `${isVid ? 'Vídeo' : 'Imagen'}: ${m.name}` || live?.deckTitle === m.name
                       const hasSlides = m.slides && m.slides.length > 0
                       return (
                         <div
@@ -1268,7 +1268,7 @@ export function HomePage({ app }: HomePageProps) {
                               }}
                             >
                               {isVid ? (
-                                <span style={{ fontSize: 14 }}>­ƒÄ¼</span>
+                                <span style={{ fontSize: 14 }}>🎬</span>
                               ) : m.value.startsWith('data:image') || m.value.startsWith('http') || m.value.startsWith('lumen-media:') ? (
                                 <img
                                   src={m.value}
@@ -1276,7 +1276,7 @@ export function HomePage({ app }: HomePageProps) {
                                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                 />
                               ) : (
-                                <span style={{ fontSize: 14 }}>­ƒû╝</span>
+                                <span style={{ fontSize: 14 }}>🖼</span>
                               )}
                               {isVid && (
                                 <span
@@ -1293,7 +1293,7 @@ export function HomePage({ app }: HomePageProps) {
                                     lineHeight: 1
                                   }}
                                 >
-                                  ÔûÂ
+                                  ▶
                                 </span>
                               )}
                             </div>
@@ -1302,7 +1302,7 @@ export function HomePage({ app }: HomePageProps) {
                                 {m.name}
                               </span>
                               <span className="hly-playlist-row__sub" style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                                {hasSlides ? `${m.slides?.length} diapositivas` : isVid ? 'V├¡deo' : 'Imagen'} {m.category ? `┬À ${m.category}` : ''}
+                                {hasSlides ? `${m.slides?.length} diapositivas` : isVid ? 'Vídeo' : 'Imagen'} {m.category ? `· ${m.category}` : ''}
                               </span>
                             </div>
                           </div>
@@ -1311,13 +1311,13 @@ export function HomePage({ app }: HomePageProps) {
                             <button
                               type="button"
                               className="hly-icon-btn"
-                              title="A├▒adir al orden del culto"
+                              title="Añadir al orden del culto"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 addMediaToSchedule(m)
                               }}
                             >
-                              Ô×ò
+                              ➕
                             </button>
                             <button
                               type="button"
@@ -1328,7 +1328,7 @@ export function HomePage({ app }: HomePageProps) {
                                 previewMedia(m)
                               }}
                             >
-                              ­ƒæü
+                              👁
                             </button>
                             <button
                               type="button"
@@ -1339,7 +1339,7 @@ export function HomePage({ app }: HomePageProps) {
                                 projectMediaImmediately(m, true)
                               }}
                             >
-                              ÔûÂ
+                              ▶
                             </button>
                             <button
                               type="button"
@@ -1349,9 +1349,9 @@ export function HomePage({ app }: HomePageProps) {
                                 e.stopPropagation()
                                 setDeleteConfirm({
                                   isOpen: true,
-                                  title: '┬┐Eliminar archivo multimedia?',
+                                  title: '¿Eliminar archivo multimedia?',
                                   itemName: m.name,
-                                  itemType: m.kind === 'video' ? 'v├¡deo' : 'imagen',
+                                  itemType: m.kind === 'video' ? 'vídeo' : 'imagen',
                                   onConfirm: () => {
                                     void app.deleteMedia(m.id)
                                     setDeleteConfirm((prev) => ({ ...prev, isOpen: false }))
@@ -1359,7 +1359,7 @@ export function HomePage({ app }: HomePageProps) {
                                 })
                               }}
                             >
-                              Ô£ò
+                              ✕
                             </button>
                           </div>
                         </div>
@@ -1374,12 +1374,12 @@ export function HomePage({ app }: HomePageProps) {
           {activeTab === 'text' && (
             <>
               <div className="hly-panel__header">
-                <span className="hly-panel__title">­ƒôó GENERADOR DE TEXTO / ALERTA EN VIVO</span>
+                <span className="hly-panel__title">📢 GENERADOR DE TEXTO / ALERTA EN VIVO</span>
               </div>
               <div className="hly-quick-text-form">
                 <div className="form-group">
                   <label className="label" htmlFor="hly-qt-title">
-                    Encabezado / T├¡tulo
+                    Encabezado / Título
                   </label>
                   <input
                     id="hly-qt-title"
@@ -1402,7 +1402,7 @@ export function HomePage({ app }: HomePageProps) {
                 </div>
                 <div className="form-group">
                   <label className="label" htmlFor="hly-qt-footer">
-                    Pie de p├ígina
+                    Pie de página
                   </label>
                   <input
                     id="hly-qt-footer"
@@ -1416,10 +1416,10 @@ export function HomePage({ app }: HomePageProps) {
           )}
         </div>
 
-        {/* PANEL CENTRAL DERECHO: PESTA├æAS ABIERTAS + P├üRRAFOS EN PREVISUALIZACI├ôN */}
+        {/* PANEL CENTRAL DERECHO: PESTAÑAS ABIERTAS + PÁRRAFOS EN PREVISUALIZACIÓN */}
         <div className="hly-panel hly-panel--flex">
           {(openSongTabIds.length > 0 || openDocTabs.length > 0) && (
-            <div className="hly-open-docs-bar" role="tablist" aria-label="Elementos abiertos en previsualizaci├│n">
+            <div className="hly-open-docs-bar" role="tablist" aria-label="Elementos abiertos en previsualización">
               {openSongTabIds.map((id) => {
                 const s = app.songs.find((item) => item.id === id)
                 if (!s) return null
@@ -1434,15 +1434,15 @@ export function HomePage({ app }: HomePageProps) {
                         setActiveTab('music')
                       }}
                     >
-                      ÔÖ¬ {s.title}
+                      ♪ {s.title}
                     </button>
                     <button
                       type="button"
                       className="hly-doc-tab__close"
-                      title="Cerrar pesta├▒a"
+                      title="Cerrar pestaña"
                       onClick={() => closeSongTab(id)}
                     >
-                      ├ù
+                      ×
                     </button>
                   </div>
                 )
@@ -1459,15 +1459,15 @@ export function HomePage({ app }: HomePageProps) {
                         setActiveTab('presentation')
                       }}
                     >
-                      ­ƒôä {doc.title}
+                      📄 {doc.title}
                     </button>
                     <button
                       type="button"
                       className="hly-doc-tab__close"
-                      title="Cerrar pesta├▒a"
+                      title="Cerrar pestaña"
                       onClick={() => closeDocTab(doc.id)}
                     >
-                      ├ù
+                      ×
                     </button>
                   </div>
                 )
@@ -1477,7 +1477,7 @@ export function HomePage({ app }: HomePageProps) {
 
           <div className="hly-panel__header">
             <div>
-              <span className="hly-panel__title">Ôûú PREVISUALIZACI├ôN: {previewTitle.toUpperCase()}</span>
+              <span className="hly-panel__title">▣ PREVISUALIZACIÓN: {previewTitle.toUpperCase()}</span>
               <div className="hly-panel__subtitle">{previewSub}</div>
             </div>
             <div className="btn-row" style={{ alignItems: 'center' }}>
@@ -1488,7 +1488,7 @@ export function HomePage({ app }: HomePageProps) {
                 title={showTagsColumn ? 'Ocultar columna de etiquetas' : 'Mostrar columna de etiquetas'}
                 onClick={() => setShowTagsColumn((prev) => !prev)}
               >
-                ­ƒÅÀ {showTagsColumn ? 'Ocultar etiqueta' : 'Ver etiqueta'}
+                🏷 {showTagsColumn ? 'Ocultar etiqueta' : 'Ver etiqueta'}
               </button>
             </div>
           </div>
@@ -1499,10 +1499,10 @@ export function HomePage({ app }: HomePageProps) {
           >
             <span>#</span>
             {showTagsColumn && <span>Etiqueta</span>}
-            <span>Letra / Contenido (1 clic previa ┬À Doble clic proyecta en vivo)</span>
+            <span>Letra / Contenido (1 clic previa · Doble clic proyecta en vivo)</span>
           </div>
 
-          <div className="hly-scroll-area" role="list" aria-label="P├írrafos en previsualizaci├│n">
+          <div className="hly-scroll-area" role="list" aria-label="Párrafos en previsualización">
             {previewSlides.map((slide, idx) => {
               const isLiveSlide = live?.deckTitle === previewTitle && live.currentIndex === idx
               return (
@@ -1567,7 +1567,7 @@ export function HomePage({ app }: HomePageProps) {
       </div>
       )}
 
-      {/* Men├║ contextual flotante al hacer clic derecho sobre una alabanza */}
+      {/* Menú contextual flotante al hacer clic derecho sobre una alabanza */}
       {contextMenu && (
         <div
           className="hly-context-menu"
@@ -1588,7 +1588,7 @@ export function HomePage({ app }: HomePageProps) {
               setContextMenu(null)
             }}
           >
-            ÔûÂ Proyectar alabanza en vivo
+            ▶ Proyectar alabanza en vivo
           </button>
           <button
             type="button"
@@ -1598,7 +1598,7 @@ export function HomePage({ app }: HomePageProps) {
               setContextMenu(null)
             }}
           >
-            Ô£Å Editar alabanza
+            ✏ Editar alabanza
           </button>
           <button
             type="button"
@@ -1613,7 +1613,7 @@ export function HomePage({ app }: HomePageProps) {
               setContextMenu(null)
             }}
           >
-            + A├▒adir a la Lista del culto
+            + Añadir a la Lista del culto
           </button>
           <div className="hly-context-menu__divider" />
           <button
@@ -1624,7 +1624,7 @@ export function HomePage({ app }: HomePageProps) {
               setContextMenu(null)
               setDeleteConfirm({
                 isOpen: true,
-                title: '┬┐Eliminar alabanza?',
+                title: '¿Eliminar alabanza?',
                 itemName: toDelete.title,
                 itemType: 'alabanza del repertorio',
                 onConfirm: () => {
@@ -1634,12 +1634,12 @@ export function HomePage({ app }: HomePageProps) {
               })
             }}
           >
-            ­ƒùæ Eliminar alabanza
+            🗑 Eliminar alabanza
           </button>
         </div>
       )}
 
-      {/* Modal flotante de edici├│n / creaci├│n r├ípida de alabanza */}
+      {/* Modal flotante de edición / creación rápida de alabanza */}
       {(editingSong || isCreatingSong) && (
         <div
           style={{
@@ -1680,7 +1680,7 @@ export function HomePage({ app }: HomePageProps) {
               }}
             >
               <h2 style={{ margin: 0, fontSize: 18, color: '#f8fafc' }}>
-                {editingSong ? `Ô£Å Editar alabanza: ${editingSong.title}` : 'Ô×ò Nueva alabanza'}
+                {editingSong ? `✏ Editar alabanza: ${editingSong.title}` : '➕ Nueva alabanza'}
               </h2>
               <button
                 type="button"
@@ -1688,7 +1688,7 @@ export function HomePage({ app }: HomePageProps) {
                 style={{ fontSize: 16, cursor: 'pointer' }}
                 onClick={closeSongModal}
               >
-                Ô£ò
+                ✕
               </button>
             </div>
 
@@ -1697,7 +1697,7 @@ export function HomePage({ app }: HomePageProps) {
               style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 1fr', gap: 10, marginBottom: 14 }}
             >
               <label className="field">
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8' }}>T├¡tulo</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8' }}>Título</span>
                 <input
                   type="text"
                   value={editTitle}
@@ -1743,39 +1743,39 @@ export function HomePage({ app }: HomePageProps) {
                 title="Elimina etiquetas web, acordes desalineados y caracteres raros"
                 onClick={() => setEditRawLyrics((prev) => cleanInternetLyrics(prev))}
               >
-                Ô£¿ Limpiar letra
+                ✨ Limpiar letra
               </button>
               <button
                 type="button"
                 className="hly-mini-btn"
-                title="Divide estrofas largas de m├ís de 4 l├¡neas para lectura clara en pantalla"
+                title="Divide estrofas largas de más de 4 líneas para lectura clara en pantalla"
                 onClick={() => {
                   const parsed = parseRawLyricsToStanzas(editRawLyrics)
                   const split = autoSplitLongStanzas(parsed, 4)
                   setEditRawLyrics(split.map((st) => `[${st.label}]\n${st.lines.join('\n')}`).join('\n\n'))
                 }}
               >
-                Ô£é Dividir estrofas &gt;4 l├¡neas
+                ✂ Dividir estrofas &gt;4 líneas
               </button>
               <button
                 type="button"
                 className="hly-mini-btn"
                 onClick={() => setEditRawLyrics((prev) => transposeChordText(prev, -1))}
               >
-                ÔÖ¡ -1 Semitono
+                ♭ -1 Semitono
               </button>
               <button
                 type="button"
                 className="hly-mini-btn"
                 onClick={() => setEditRawLyrics((prev) => transposeChordText(prev, 1))}
               >
-                ÔÖ» +1 Semitono
+                ♯ +1 Semitono
               </button>
             </div>
 
             <label className="field" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8' }}>
-                Letra de la alabanza (Estrofas separadas por l├¡nea en blanco o etiquetas [Verso 1], [Coro])
+                Letra de la alabanza (Estrofas separadas por línea en blanco o etiquetas [Verso 1], [Coro])
               </span>
               <textarea
                 rows={12}
@@ -1817,13 +1817,13 @@ export function HomePage({ app }: HomePageProps) {
                 className="btn btn--primary"
                 onClick={() => void handleSaveEditedSong()}
               >
-                {editingSong ? '­ƒÆ¥ Guardar cambios' : '­ƒÆ¥ Guardar alabanza'}
+                {editingSong ? '💾 Guardar cambios' : '💾 Guardar alabanza'}
               </button>
             </div>
           </div>
         </div>
       )}
-      {/* Modal elegante de confirmaci├│n de eliminaci├│n */}
+      {/* Modal elegante de confirmación de eliminación */}
       <ConfirmDeleteModal
         isOpen={deleteConfirm.isOpen}
         title={deleteConfirm.title}
