@@ -23,7 +23,10 @@ import type {
   ScheduleMoveRequest,
   Song,
   SongInput,
-  SongStanza
+  SongStanza,
+  YoutubeVideoInfo,
+  YoutubeDownloadRequest,
+  YoutubeProgressPayload
 } from './ipc'
 
 /**
@@ -73,6 +76,10 @@ export interface LumenApi {
   readonly openBackgroundsFolder?: () => Promise<string>
   readonly reloadBackgrounds?: () => Promise<MediaBackground[]>
   readonly getPathForFile?: (file: File) => string
+  readonly getYoutubeInfo?: (url: string) => Promise<YoutubeVideoInfo>
+  readonly downloadYoutubeVideo?: (request: YoutubeDownloadRequest) => Promise<MediaBackground[]>
+  readonly cancelYoutubeDownload?: () => Promise<boolean>
+  readonly onYoutubeDownloadProgress?: (listener: (payload: YoutubeProgressPayload) => void) => () => void
 
   /** Diapositivas y presentaciones (PDF / PowerPoint) */
   readonly listPresentations?: () => Promise<PresentationDeck[]>

@@ -8,6 +8,20 @@ export interface ChangelogRelease {
 
 export const APP_CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.1.14',
+    date: '2 de Noviembre de 2026',
+    title: 'Descarga Directa de Vídeos de YouTube en Medios',
+    tagline: 'Agrega cualquier vídeo o fondo desde YouTube pegando el enlace directamente en la aplicación.',
+    highlights: [
+      '▶ Descarga Directa de YouTube: pega un enlace de YouTube, Shorts o Compartir y descárgalo directamente a la carpeta de Medios.',
+      '⚡ Detección Instantánea de Título y Miniatura: vista previa automática con nombre, canal y carátula del vídeo.',
+      '✏ Título y Categoría Personalizables: edita el nombre antes de guardar y selecciona la categoría (Culto, Fondo, Anuncios, etc.).',
+      '📊 Progreso en Tiempo Real: barra de descarga con porcentaje, velocidad de transferencia y tiempo estimado.',
+      '🛡 Aislamiento Seguro: los vídeos de YouTube van estrictamente a Medios sin interferir con presentaciones o diapositivas.',
+      '🎯 Botón Rápido en Inicio y Medios: acceso con un clic a "▶ YouTube" junto al botón de importar.'
+    ]
+  },
+  {
     version: '0.1.13',
     date: '1 de Noviembre de 2026',
     title: 'Ventana de Novedades y Auto-Actualizador Directo',

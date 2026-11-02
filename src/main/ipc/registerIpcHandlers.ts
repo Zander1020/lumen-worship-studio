@@ -21,8 +21,11 @@ import {
   parseScheduleItemInput,
   parseScheduleMoveRequest,
   parseSettingsPatch,
-  parseSongInput
+  parseSongInput,
+  parseYoutubeDownloadRequest,
+  parseYoutubeInfoRequest
 } from '../../shared/validation'
+import { getYoutubeInfo, youtubeDownloadManager } from '../services/youtubeDownloader'
 import type { RemoteControlServer } from '../remote/remoteControlServer'
 import { isSenderAllowed, type SenderInfo } from '../security/senderPolicy'
 import type { StatusStore } from '../state/statusStore'
@@ -252,6 +255,44 @@ export function registerIpcHandlers(ctx: IpcContext): () => void {
   handle(IpcChannels.mediaReload, onlyMain, (payload) => {
     assertNoPayload(payload)
     return ctx.workspace.reloadMedia()
+  })
+
+  handle(IpcChannels.mediaYoutubeGetInfo, onlyMain, async (payload) => {
+    const req = parseYoutubeInfoRequest(payload)
+    return await getYoutubeInfo(req.url)
+  })
+
+  handle(IpcChannels.mediaYoutubeDownload, onlyMain, async (payload) => {
+    const req = parseYoutubeDownloadRequest(payload)
+    const mediaDir = ctx.workspace.getMediaDirectory()
+    const { app } = await import('electron')
+    const userDataDir = app.getPath('userData')
+
+    const downloaded = await youtubeDownloadManager.download({
+      request: req,
+      mediaDir,
+      userDataDir,
+      onProgress: (p) => {
+        const mainWin = ctx.getMainWindow?.()
+        if (mainWin && !mainWin.isDestroyed()) {
+          mainWin.webContents.send(IpcChannels.mediaYoutubeProgress, p)
+        }
+      }
+    })
+
+    const fileUrl = 'lumen-media://local/' + encodeURIComponent(downloaded.filePath.replace(/\\/g, '/'))
+    return ctx.workspace.addMedia({
+      name: downloaded.title,
+      kind: 'video',
+      value: fileUrl,
+      category: req.category || 'Culto',
+      accentColor: '#38bdf8'
+    })
+  })
+
+  handle(IpcChannels.mediaYoutubeCancel, onlyMain, (payload) => {
+    assertNoPayload(payload)
+    return youtubeDownloadManager.cancel()
   })
 
   handle(IpcChannels.backgroundsOpenFolder, onlyMain, async (payload) => {

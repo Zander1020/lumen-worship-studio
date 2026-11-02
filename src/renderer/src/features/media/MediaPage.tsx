@@ -4,6 +4,7 @@ import { isVideoUrl } from '../../../../shared/slideHelpers'
 import { MotionVideoBackground } from '../../components/SlidePreviewStage'
 import type { UseAppStatus } from '../../hooks/useAppStatus'
 import { ConfirmDeleteModal } from '../../components/ConfirmDeleteModal'
+import { YoutubeDownloadModal } from '../../components/YoutubeDownloadModal'
 
 export interface MediaPageProps {
   app: UseAppStatus
@@ -30,6 +31,7 @@ export function MediaPage({ app }: MediaPageProps) {
     onConfirm: () => {}
   })
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isYoutubeModalOpen, setIsYoutubeModalOpen] = useState(false)
 
   // Estados para añadir fondo personalizado
   const [name, setName] = useState('')
@@ -242,6 +244,24 @@ export function MediaPage({ app }: MediaPageProps) {
             aria-label="Subir imágenes del culto"
             onChange={handleFileInputChange}
           />
+          <button
+            type="button"
+            className="hly-mini-btn"
+            style={{
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              color: '#f87171',
+              borderColor: 'rgba(239, 68, 68, 0.45)',
+              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+              marginRight: 6
+            }}
+            title="Descargar vídeo directamente desde un enlace de YouTube"
+            onClick={() => setIsYoutubeModalOpen(true)}
+          >
+            ▶ YouTube
+          </button>
           <button
             type="button"
             className="hly-mini-btn hly-mini-btn--primary"
@@ -648,6 +668,11 @@ export function MediaPage({ app }: MediaPageProps) {
         itemType={deleteConfirm.itemType}
         onConfirm={deleteConfirm.onConfirm}
         onCancel={() => setDeleteConfirm((prev) => ({ ...prev, isOpen: false }))}
+      />
+      <YoutubeDownloadModal
+        isOpen={isYoutubeModalOpen}
+        onClose={() => setIsYoutubeModalOpen(false)}
+        app={app}
       />
     </section>
   )

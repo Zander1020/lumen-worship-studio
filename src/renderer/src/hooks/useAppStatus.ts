@@ -23,7 +23,9 @@ import type {
   ScheduleMoveRequest,
   Song,
   SongInput,
-  SongStanza
+  SongStanza,
+  YoutubeDownloadRequest,
+  YoutubeVideoInfo
 } from '../../../shared/ipc'
 import { parseRawLyricsToStanzas } from '../../../shared/slideHelpers'
 
@@ -73,6 +75,9 @@ export interface UseAppStatus {
   reloadMedia: () => Promise<void>
   openBackgroundsFolder?: () => Promise<void>
   reloadBackgrounds?: () => Promise<void>
+  getYoutubeInfo: (url: string) => Promise<YoutubeVideoInfo>
+  downloadYoutubeVideo: (request: YoutubeDownloadRequest) => Promise<void>
+  cancelYoutubeDownload: () => Promise<boolean>
 
   presentations: PresentationDeck[]
   savePresentation: (deck: PresentationDeck) => Promise<void>
@@ -505,6 +510,42 @@ export function useAppStatus(): UseAppStatus {
     }
   }, [api])
 
+  const getYoutubeInfo = useCallback(
+    async (url: string) => {
+      if (!api || typeof api.getYoutubeInfo !== 'function') {
+        throw new Error('Función de YouTube no disponible.')
+      }
+      return await api.getYoutubeInfo(url)
+    },
+    [api]
+  )
+
+  const downloadYoutubeVideo = useCallback(
+    async (request: YoutubeDownloadRequest) => {
+      if (!api || typeof api.downloadYoutubeVideo !== 'function') {
+        throw new Error('Función de descarga no disponible.')
+      }
+      setBusy(true)
+      setError(null)
+      try {
+        const updated = await api.downloadYoutubeVideo(request)
+        setMedia(updated)
+        setNotice('Vídeo descargado con éxito y añadido a Medios.')
+      } catch (err: unknown) {
+        setError(messageOf(err))
+        throw err
+      } finally {
+        setBusy(false)
+      }
+    },
+    [api]
+  )
+
+  const cancelYoutubeDownload = useCallback(async () => {
+    if (!api || typeof api.cancelYoutubeDownload !== 'function') return false
+    return await api.cancelYoutubeDownload()
+  }, [api])
+
   const savePresentation = useCallback(
     async (deck: PresentationDeck) => {
       if (!api || typeof api.savePresentation !== 'function') {
@@ -688,6 +729,9 @@ export function useAppStatus(): UseAppStatus {
     reloadMedia,
     openBackgroundsFolder,
     reloadBackgrounds,
+    getYoutubeInfo,
+    downloadYoutubeVideo,
+    cancelYoutubeDownload,
     presentations,
     savePresentation,
     deletePresentation,

@@ -10,7 +10,9 @@ import {
   parseProjectionSetModeRequest,
   parseProjectionThemePatch,
   parseScheduleMoveRequest,
-  parseSongInput
+  parseSongInput,
+  parseYoutubeDownloadRequest,
+  parseYoutubeInfoRequest
 } from './validation'
 
 describe('parseProjectionOpenRequest', () => {
@@ -142,5 +144,43 @@ describe('isTrustedAppUrl', () => {
     expect(isTrustedAppUrl('http://localhost:5173/index.html', 'http://localhost:5173')).toBe(true)
     expect(isTrustedAppUrl('http://127.0.0.1:5173/projection.html', 'http://127.0.0.1:5173')).toBe(true)
     expect(isTrustedAppUrl('http://localhost:9999/index.html', 'http://localhost:5173')).toBe(false)
+  })
+})
+
+describe('parseYoutubeInfoRequest y parseYoutubeDownloadRequest', () => {
+  it('valida parseYoutubeInfoRequest con string u objeto', () => {
+    expect(parseYoutubeInfoRequest('https://www.youtube.com/watch?v=dQw4w9WgXcQ')).toEqual({
+      url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+    })
+    expect(parseYoutubeInfoRequest({ url: 'https://youtu.be/dQw4w9WgXcQ' })).toEqual({
+      url: 'https://youtu.be/dQw4w9WgXcQ'
+    })
+    expect(() => parseYoutubeInfoRequest('')).toThrow(ValidationError)
+    expect(() => parseYoutubeInfoRequest(null)).toThrow(ValidationError)
+  })
+
+  it('valida parseYoutubeDownloadRequest', () => {
+    expect(
+      parseYoutubeDownloadRequest({
+        url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        customTitle: 'Mi Canción',
+        category: 'Culto'
+      })
+    ).toEqual({
+      url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      customTitle: 'Mi Canción',
+      category: 'Culto'
+    })
+
+    expect(
+      parseYoutubeDownloadRequest({
+        url: 'https://youtu.be/dQw4w9WgXcQ'
+      })
+    ).toEqual({
+      url: 'https://youtu.be/dQw4w9WgXcQ'
+    })
+
+    expect(() => parseYoutubeDownloadRequest({})).toThrow(ValidationError)
+    expect(() => parseYoutubeDownloadRequest(null)).toThrow(ValidationError)
   })
 })

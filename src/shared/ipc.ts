@@ -80,6 +80,10 @@ export const IpcChannels = {
   mediaDelete: 'media:delete',
   mediaOpenFolder: 'media:open-folder',
   mediaReload: 'media:reload',
+  mediaYoutubeGetInfo: 'media:youtube-get-info',
+  mediaYoutubeDownload: 'media:youtube-download',
+  mediaYoutubeCancel: 'media:youtube-cancel',
+  mediaYoutubeProgress: 'media:youtube-progress',
   backgroundsOpenFolder: 'backgrounds:open-folder',
   backgroundsReload: 'backgrounds:reload',
 
@@ -207,6 +211,38 @@ export interface AppInfo {
   electron: string
   chrome: string
   node: string
+}
+
+export interface YoutubeVideoInfo {
+  id: string
+  url: string
+  title: string
+  author?: string
+  thumbnailUrl?: string
+  durationSeconds?: number
+}
+
+export interface YoutubeDownloadRequest {
+  url: string
+  customTitle?: string
+  category?: string
+}
+
+export interface YoutubeProgressPayload {
+  url: string
+  percent: number
+  speed?: string
+  eta?: string
+  status:
+    | 'initializing'
+    | 'downloading-binary'
+    | 'fetching-info'
+    | 'downloading'
+    | 'processing'
+    | 'completed'
+    | 'error'
+    | 'cancelled'
+  message?: string
 }
 
 export type {

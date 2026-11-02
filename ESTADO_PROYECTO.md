@@ -1,6 +1,6 @@
 # ESTADO ACTUAL Y MEMORIA DEL PROYECTO: LUMEN STUDIO
-**Fecha de corte:** 31 de Octubre de 2026  
-**Última versión publicada:** `v0.1.13`  
+**Fecha de corte:** 2 de Noviembre de 2026  
+**Última versión en desarrollo:** `v0.1.14` (previa publicada: `v0.1.13`)
 **Repositorio GitHub:** [https://github.com/Zander1020/lumen-worship-studio](https://github.com/Zander1020/lumen-worship-studio)  
 **Release activo:** `v0.1.13` (incluye `Lumen-Studio-Setup-0.1.13.exe` y `Lumen-Studio-Setup-0.1.13.exe.blockmap`)  
 **Rama principal:** `main` (al día con `origin/main` y tags `v0.1.8`, `v0.1.9`, `v0.1.10`, `v0.1.11`, `v0.1.12` y `v0.1.13`)
@@ -47,6 +47,28 @@
 ### Audio en Proyección
 - Las previsualizaciones en la pantalla del operador (cabina) tienen `muted={true}` para evitar ruidos indeseados.
 - La ventana de proyección en vivo (`projectionWindow`) tiene audio habilitado al 100%.
+
+---
+
+### Descarga e Integración de Vídeos de YouTube en Medios (v0.1.14)
+- **Funcionalidad:** Permite agregar vídeos directamente a Medios pegando un enlace de YouTube (estándar, shorts, embebidos o compartir).
+- **Servicio Principal (`src/main/services/youtubeDownloader.ts`):**
+  - Motor basado en el ejecutable standalone de `yt-dlp`. Localiza el ejecutable en el sistema (PATH, resources o `userData/bin`) y lo descarga automáticamente de GitHub Releases en primer uso si el equipo no lo tiene.
+  - Extracción ultrarrápida de metadatos (título, autor, miniatura) mediante oEmbed de YouTube (<200 ms).
+  - Sanitización de nombres de archivo y empaquetado en MP4 Full HD.
+  - Cancelación limpia de descargas mediante terminación de subprocesos.
+- **Canales IPC y Validación:**
+  - `media:youtube-get-info`: Consulta metadatos del video.
+  - `media:youtube-download`: Ejecuta la descarga y registra el medio en `WorkspaceStore` en la categoría indicada.
+  - `media:youtube-cancel`: Cancela la descarga activa y limpia archivos temporales.
+  - `media:youtube-progress`: Emite porcentaje, velocidad y tiempo estimado en tiempo real.
+- **Componente Modal (`src/renderer/src/components/YoutubeDownloadModal.tsx`):**
+  - Botón de pegar desde el portapapeles con un clic.
+  - Previsualización inmediata de carátula y canal de YouTube.
+  - Campo editable para renombrar el título antes de guardar.
+  - Selector de categoría (Culto, Fondo, Anuncios, Bienvenida, Sermón, General).
+  - Barra de progreso en tiempo real con % y velocidad.
+- **Aislamiento estricto:** El vídeo descargado se almacena exclusivamente en `AppData\Roaming\Lumen Studio\media`, jamás en `diapositivas/`.
 
 ---
 

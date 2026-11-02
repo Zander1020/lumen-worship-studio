@@ -6,8 +6,8 @@ export interface WhatsNewModalProps {
 }
 
 const DEFAULT_RELEASE: ChangelogRelease = APP_CHANGELOG[0] ?? {
-  version: '0.1.13',
-  date: '1 de Noviembre de 2026',
+  version: '0.1.14',
+  date: '2 de Noviembre de 2026',
   title: 'Novedades de la versión',
   tagline: 'Mejoras y optimizaciones del sistema.',
   highlights: []
@@ -16,7 +16,7 @@ const DEFAULT_RELEASE: ChangelogRelease = APP_CHANGELOG[0] ?? {
 export function WhatsNewModal({ onNavigateToAbout }: WhatsNewModalProps): React.JSX.Element | null {
   const [isOpen, setIsOpen] = useState(false)
   const [release, setRelease] = useState<ChangelogRelease>(DEFAULT_RELEASE)
-  const [currentVersion, setCurrentVersion] = useState<string>('0.1.13')
+  const [currentVersion, setCurrentVersion] = useState<string>('0.1.14')
 
   useEffect(() => {
     // 1. Obtener la versión actual de la app
@@ -24,7 +24,7 @@ export function WhatsNewModal({ onNavigateToAbout }: WhatsNewModalProps): React.
 
     const checkVersion = async (): Promise<void> => {
       try {
-        let appVersion = '0.1.13'
+        let appVersion = '0.1.14'
         if (window.lumen?.getAppInfo) {
           const info = await window.lumen.getAppInfo()
           if (info.version) {

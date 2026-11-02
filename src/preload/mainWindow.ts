@@ -32,7 +32,10 @@ import {
   type ScheduleMoveRequest,
   type Song,
   type SongInput,
-  type SongStanza
+  type SongStanza,
+  type YoutubeDownloadRequest,
+  type YoutubeProgressPayload,
+  type YoutubeVideoInfo
 } from '../shared/ipc'
 
 const api: LumenApi = {
@@ -93,6 +96,21 @@ const api: LumenApi = {
   deleteMedia: (id: string) => ipcRenderer.invoke(IpcChannels.mediaDelete, id) as Promise<MediaBackground[]>,
   openMediaFolder: () => ipcRenderer.invoke(IpcChannels.mediaOpenFolder) as Promise<string>,
   reloadMedia: () => ipcRenderer.invoke(IpcChannels.mediaReload) as Promise<MediaBackground[]>,
+  getYoutubeInfo: (url: string) =>
+    ipcRenderer.invoke(IpcChannels.mediaYoutubeGetInfo, { url }) as Promise<YoutubeVideoInfo>,
+  downloadYoutubeVideo: (request: YoutubeDownloadRequest) =>
+    ipcRenderer.invoke(IpcChannels.mediaYoutubeDownload, request) as Promise<MediaBackground[]>,
+  cancelYoutubeDownload: () =>
+    ipcRenderer.invoke(IpcChannels.mediaYoutubeCancel) as Promise<boolean>,
+  onYoutubeDownloadProgress: (listener: (payload: YoutubeProgressPayload) => void) => {
+    const wrapped = (_event: IpcRendererEvent, payload: YoutubeProgressPayload): void => {
+      listener(payload)
+    }
+    ipcRenderer.on(IpcChannels.mediaYoutubeProgress, wrapped)
+    return () => {
+      ipcRenderer.removeListener(IpcChannels.mediaYoutubeProgress, wrapped)
+    }
+  },
   openBackgroundsFolder: () => ipcRenderer.invoke(IpcChannels.backgroundsOpenFolder) as Promise<string>,
   reloadBackgrounds: () => ipcRenderer.invoke(IpcChannels.backgroundsReload) as Promise<MediaBackground[]>,
   listPresentations: () => ipcRenderer.invoke(IpcChannels.slidesList) as Promise<PresentationDeck[]>,

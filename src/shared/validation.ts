@@ -19,7 +19,8 @@ import type {
   SlideSourceKind,
   SongInput,
   SongStanza,
-  StanzaKind
+  StanzaKind,
+  YoutubeDownloadRequest
 } from './ipc'
 
 /**
@@ -600,4 +601,35 @@ export function isTrustedAppUrl(url: string, devServerUrl?: string): boolean {
     return isLocalHost && parsed.origin === dev.origin
   }
   return false
+}
+
+
+/**
+ * Valida la solicitud de información de un vídeo de YouTube.
+ */
+export function parseYoutubeInfoRequest(input: unknown): { url: string } {
+  if (typeof input === 'string') {
+    return { url: requireNonEmptyString(input, 'url', 2000) }
+  }
+  if (!isPlainObject(input)) {
+    throw new ValidationError('La solicitud debe ser una cadena o un objeto con la URL.')
+  }
+  return { url: requireNonEmptyString(input['url'], 'url', 2000) }
+}
+
+/**
+ * Valida la solicitud de descarga de un vídeo de YouTube.
+ */
+export function parseYoutubeDownloadRequest(input: unknown): YoutubeDownloadRequest {
+  if (!isPlainObject(input)) {
+    throw new ValidationError('La solicitud de descarga de YouTube debe ser un objeto.')
+  }
+  const url = requireNonEmptyString(input['url'], 'url', 2000)
+  const customTitle = optionalString(input['customTitle'], 'customTitle', 200) || undefined
+  const category = optionalString(input['category'], 'category', 100) || undefined
+  return {
+    url,
+    ...(customTitle ? { customTitle } : {}),
+    ...(category ? { category } : {})
+  }
 }

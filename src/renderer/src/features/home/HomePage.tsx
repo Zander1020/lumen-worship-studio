@@ -15,6 +15,7 @@ import type { UseAppStatus } from '../../hooks/useAppStatus'
 import { BiblePage } from '../bible/BiblePage'
 import { ConfirmDeleteModal } from '../../components/ConfirmDeleteModal'
 import { MediaPreviewModal } from '../../components/MediaPreviewModal'
+import { YoutubeDownloadModal } from '../../components/YoutubeDownloadModal'
 
 export interface HomePageProps {
   app: UseAppStatus
@@ -296,6 +297,7 @@ export function HomePage({ app }: HomePageProps) {
 
   // Estado de Texto / Alerta rápida estilo Holyrics
   const [isReloadingMedia, setIsReloadingMedia] = useState(false)
+  const [isYoutubeModalOpen, setIsYoutubeModalOpen] = useState(false)
   const [quickTitle, setQuickTitle] = useState('Bienvenidos al Servicio de Adoración')
   const [quickBody, setQuickBody] = useState('Dios bendiga tu vida y tu familia en este día.')
   const [quickFooter, setQuickFooter] = useState('Lumen Worship Studio')
@@ -1205,6 +1207,23 @@ export function HomePage({ app }: HomePageProps) {
                   </button>
                   <button
                     type="button"
+                    className="hly-mini-btn"
+                    style={{
+                      fontWeight: 700,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      color: '#f87171',
+                      borderColor: 'rgba(239, 68, 68, 0.45)',
+                      backgroundColor: 'rgba(239, 68, 68, 0.1)'
+                    }}
+                    title="Descargar vídeo directamente desde un enlace de YouTube"
+                    onClick={() => setIsYoutubeModalOpen(true)}
+                  >
+                    ▶ YouTube
+                  </button>
+                  <button
+                    type="button"
                     className="hly-mini-btn hly-mini-btn--primary"
                     style={{ fontWeight: 700 }}
                     title="Añadir imágenes o vídeos del culto"
@@ -1852,6 +1871,11 @@ export function HomePage({ app }: HomePageProps) {
           projectMediaImmediately(m, true)
         }}
         onClose={() => setMediaPreview(null)}
+      />
+      <YoutubeDownloadModal
+        isOpen={isYoutubeModalOpen}
+        onClose={() => setIsYoutubeModalOpen(false)}
+        app={app}
       />
     </section>
   )
