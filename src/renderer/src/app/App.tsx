@@ -6,6 +6,7 @@ import { Sidebar } from '../components/layout/Sidebar'
 import { StatusBar } from '../components/layout/StatusBar'
 import { TitleBar } from '../components/layout/TitleBar'
 import { UpdateNotifierModal } from '../components/UpdateNotifierModal'
+import { WhatsNewModal } from '../components/WhatsNewModal'
 import { renderSection } from '../features/sectionRegistry'
 import { useAppStatus } from '../hooks/useAppStatus'
 
@@ -39,6 +40,7 @@ export function App() {
       </div>
       <StatusBar status={app.status} />
       <UpdateNotifierModal />
+      <WhatsNewModal onNavigateToAbout={() => setSection('about')} />
     </div>
   )
 }

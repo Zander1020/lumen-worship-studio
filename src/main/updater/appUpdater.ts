@@ -129,5 +129,12 @@ export function initAutoUpdater(getMainWindow: () => BrowserWindow | null): void
         // Fallos de red silenciosos en el chequeo inicial automático
       })
     }
-  }, 5000)
+  }, 3000)
+
+  // Comprobar periódicamente cada 30 minutos mientras la app esté abierta
+  setInterval(() => {
+    if (app.isPackaged) {
+      autoUpdater.checkForUpdates().catch(() => {})
+    }
+  }, 30 * 60 * 1000)
 }

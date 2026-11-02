@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
+import { APP_CHANGELOG } from '../../../../shared/changelog'
 import lumenLogo from '../../assets/lumen.png'
 
 export function AboutPage() {
-  const [version, setVersion] = useState<string>('0.1.3')
+  const [version, setVersion] = useState<string>('0.1.13')
+  const [showHistory, setShowHistory] = useState(false)
 
   useEffect(() => {
     if (window.lumen?.getAppInfo) {
@@ -100,6 +102,133 @@ export function AboutPage() {
               ✓ Aceleración de vídeo por GPU y streaming sin cortes
             </div>
           </div>
+        </div>
+
+        {/* Tarjeta de Novedades y Registro de Cambios */}
+        <div
+          style={{
+            background: 'var(--bg-panel)',
+            border: '1px solid var(--border)',
+            borderRadius: 12,
+            padding: '24px 28px',
+            marginBottom: 24,
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <h3
+              style={{
+                margin: 0,
+                fontSize: 16,
+                fontWeight: 800,
+                color: '#2563eb',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8
+              }}
+            >
+              🚀 Novedades y Registro de Cambios
+            </h3>
+            <button
+              type="button"
+              className="button button--secondary"
+              onClick={() => window.dispatchEvent(new CustomEvent('lumen:show-whats-new'))}
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                padding: '4px 12px',
+                borderRadius: 6,
+                cursor: 'pointer'
+              }}
+              title="Abrir la ventana de novedades de esta versión"
+            >
+              ✨ Ver ventana de novedades
+            </button>
+          </div>
+
+          {/* Versión actual destacada */}
+          {APP_CHANGELOG[0] && (
+            <div
+              style={{
+                backgroundColor: 'rgba(37, 99, 235, 0.05)',
+                border: '1px solid rgba(37, 99, 235, 0.2)',
+                borderRadius: 8,
+                padding: 16,
+                marginBottom: 16
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)' }}>
+                  v{APP_CHANGELOG[0].version} — {APP_CHANGELOG[0].title}
+                </span>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{APP_CHANGELOG[0].date}</span>
+              </div>
+              <p style={{ margin: '0 0 12px 0', fontSize: 13, color: 'var(--text-muted)' }}>
+                {APP_CHANGELOG[0].tagline}
+              </p>
+              <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {APP_CHANGELOG[0].highlights.map((item, idx) => (
+                  <li key={idx} style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.45 }}>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Historial de versiones anteriores */}
+          {APP_CHANGELOG.length > 1 && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowHistory(!showHistory)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#2563eb',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  padding: 0,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}
+              >
+                <span>{showHistory ? '▼ Ocultar versiones anteriores' : '▶ Ver historial de versiones anteriores'}</span>
+              </button>
+
+              {showHistory && (
+                <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {APP_CHANGELOG.slice(1).map((release) => (
+                    <div
+                      key={release.version}
+                      style={{
+                        backgroundColor: 'var(--bg-hover)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 8,
+                        padding: 14
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>
+                          v{release.version} — {release.title}
+                        </span>
+                        <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{release.date}</span>
+                      </div>
+                      <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {release.highlights.map((h, i) => (
+                          <li key={i} style={{ fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                            {h}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Tarjeta del Desarrollador y Creador */}

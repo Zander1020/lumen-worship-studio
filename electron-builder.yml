@@ -7,6 +7,7 @@ publish:
   provider: github
   owner: Zander1020
   repo: lumen-worship-studio
+  releaseType: release
 files:
   - '!**/.vscode/*'
   - '!src/*'
