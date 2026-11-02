@@ -679,7 +679,7 @@ export function LiveDock({ app }: LiveDockProps) {
                       }}
                       title={`Fondo: ${item.name}`}
                     >
-                      {item.kind === 'video' && <MotionVideoBackground value={item.value} />}
+                      {item.kind === 'video' && <MotionVideoBackground value={item.value} playing={active} />}
                       {item.kind === 'video' && (
                         <span
                           style={{

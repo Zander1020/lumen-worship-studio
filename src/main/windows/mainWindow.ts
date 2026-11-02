@@ -26,7 +26,9 @@ export function createMainWindow(options: MainWindowOptions): BrowserWindow {
     backgroundColor: '#0f1117',
     frame: false,
     autoHideMenuBar: true,
-    webPreferences: createSecureWebPreferences(options.preloadPath, options.allowDevTools)
+    webPreferences: createSecureWebPreferences(options.preloadPath, options.allowDevTools, {
+      backgroundThrottling: true
+    })
   })
 
   win.setMenu(null)

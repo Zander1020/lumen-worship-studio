@@ -55,6 +55,7 @@ export class RemoteControlServer {
   private activePort = 0
   private readonly sseClients = new Set<ServerResponse>()
   private unsubscribeStore: (() => void) | null = null
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null
 
   constructor(
     private readonly statusStore: StatusStore,
@@ -118,11 +119,26 @@ export class RemoteControlServer {
       }
     })
 
+    // Keep-alive: evita que Wi-Fi/routers maten las conexiones SSE inactivas
+    this.heartbeatTimer = setInterval(() => {
+      for (const client of this.sseClients) {
+        try {
+          client.write(': ping\n\n')
+        } catch {
+          this.sseClients.delete(client)
+        }
+      }
+    }, 25_000)
+
     this.syncMobileStatus()
     return this.getInfo()
   }
 
   async stop(): Promise<RemoteServerInfo> {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer)
+      this.heartbeatTimer = null
+    }
     if (this.unsubscribeStore) {
       this.unsubscribeStore()
       this.unsubscribeStore = null
@@ -182,7 +198,9 @@ export class RemoteControlServer {
         }
       }
     }
-    urls.push(`http://localhost:${port}`)
+    // 127.0.0.1 (IPv4 loopback) siempre funciona en la misma máquina;
+    // "localhost" puede resolverse a ::1 (IPv6) y el servidor solo escucha en IPv4.
+    urls.push(`http://127.0.0.1:${port}`)
     return urls
   }
 
@@ -442,6 +460,8 @@ export class RemoteControlServer {
         'Cache-Control': 'no-cache',
         Connection: 'keep-alive'
       })
+      // Reconexión rápida del EventSource (el default del navegador puede tardar mucho)
+      res.write('retry: 3000\n\n')
       res.write(
         `data: ${JSON.stringify({
           projection: this.statusStore.get().projection,
@@ -1389,8 +1409,10 @@ function renderMobileHtml(): string {
     }
 
     function promptPin() {
+      const modal = document.getElementById('pinModal');
+      if (modal.style.display === 'flex') return; // ya abierto: no resetear lo que el usuario escribe
       document.getElementById('modalPinInput').value = currentPin;
-      document.getElementById('pinModal').style.display = 'flex';
+      modal.style.display = 'flex';
     }
 
     function submitPin() {
@@ -1425,7 +1447,26 @@ function renderMobileHtml(): string {
       sseSource.onerror = () => {
         document.getElementById('netDot').classList.remove('connected');
         document.getElementById('modeBadge').textContent = 'DESCONECTADO';
+        verifyPin();
       };
+    }
+
+    // Distingue un PIN obsoleto (401) de una caída de red y refresca el estado.
+    async function verifyPin() {
+      try {
+        const res = await fetch('/api/state?pin=' + encodeURIComponent(currentPin), {
+          headers: { 'x-lumen-pin': currentPin }
+        });
+        if (res.status === 401) { promptPin(); return; }
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.projection) {
+            updateLiveUI(data.projection.live, data.schedule, data.projection.windowOpen);
+          }
+        }
+      } catch (e) {
+        // Sin red: el EventSource se reconectará solo (retry 3s)
+      }
     }
 
     function updateLiveUI(live, schedule, windowOpen) {
@@ -1899,6 +1940,26 @@ function renderMobileHtml(): string {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
     }
+
+    // Respaldo: si el SSE está caído, refrescar el estado por HTTP cada 4 s
+    setInterval(async () => {
+      if (!currentPin) return;
+      if (sseSource && sseSource.readyState === EventSource.OPEN) return;
+      try {
+        const res = await fetch('/api/state?pin=' + encodeURIComponent(currentPin), {
+          headers: { 'x-lumen-pin': currentPin }
+        });
+        if (res.status === 401) { promptPin(); return; }
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.projection) {
+            updateLiveUI(data.projection.live, data.schedule, data.projection.windowOpen);
+          }
+        }
+      } catch (e) {
+        // offline
+      }
+    }, 4000);
 
     // Inicio automático
     initConnection();

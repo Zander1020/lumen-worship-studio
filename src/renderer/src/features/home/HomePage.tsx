@@ -14,6 +14,7 @@ import { convertPdfToSlides, convertPptxToSlides } from './presentationDocHelper
 import type { UseAppStatus } from '../../hooks/useAppStatus'
 import { BiblePage } from '../bible/BiblePage'
 import { ConfirmDeleteModal } from '../../components/ConfirmDeleteModal'
+import { MediaPreviewModal } from '../../components/MediaPreviewModal'
 
 export interface HomePageProps {
   app: UseAppStatus
@@ -58,6 +59,7 @@ export function HomePage({ app }: HomePageProps) {
     itemType: '',
     onConfirm: () => {}
   })
+  const [mediaPreview, setMediaPreview] = useState<MediaBackground | null>(null)
   const homeMediaInputRef = useRef<HTMLInputElement | null>(null)
   const presentationFileInputRef = useRef<HTMLInputElement | null>(null)
   const activeSlideRef = useRef<HTMLButtonElement | null>(null)
@@ -645,7 +647,7 @@ export function HomePage({ app }: HomePageProps) {
 
   const previewMedia = (img: MediaBackground): void => {
     setSelectedImageId(img.id)
-    projectMediaImmediately(img, false)
+    setMediaPreview(img)
   }
 
   return (
@@ -1268,7 +1270,17 @@ export function HomePage({ app }: HomePageProps) {
                               }}
                             >
                               {isVid ? (
-                                <span style={{ fontSize: 14 }}>🎬</span>
+                                m.value.startsWith('motion:') ? (
+                                  <span style={{ fontSize: 14 }}>🎬</span>
+                                ) : (
+                                  <video
+                                    src={`${resolveMediaVideoUrl(m.value)}#t=0.5`}
+                                    preload="metadata"
+                                    muted
+                                    playsInline
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  />
+                                )
                               ) : m.value.startsWith('data:image') || m.value.startsWith('http') || m.value.startsWith('lumen-media:') ? (
                                 <img
                                   src={m.value}
@@ -1322,7 +1334,7 @@ export function HomePage({ app }: HomePageProps) {
                             <button
                               type="button"
                               className="hly-icon-btn"
-                              title="Vista previa en cabina"
+                              title="Vista previa (no proyecta)"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 previewMedia(m)
@@ -1831,6 +1843,15 @@ export function HomePage({ app }: HomePageProps) {
         itemType={deleteConfirm.itemType}
         onConfirm={deleteConfirm.onConfirm}
         onCancel={() => setDeleteConfirm((prev) => ({ ...prev, isOpen: false }))}
+      />
+      {/* Modal de vista previa local (no toca cabina ni proyección) */}
+      <MediaPreviewModal
+        media={mediaPreview}
+        onProject={(m) => {
+          setMediaPreview(null)
+          projectMediaImmediately(m, true)
+        }}
+        onClose={() => setMediaPreview(null)}
       />
     </section>
   )

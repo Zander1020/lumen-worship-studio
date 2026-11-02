@@ -983,7 +983,32 @@ export class WorkspaceStore {
     }
   }
 
+  private saveTimer: ReturnType<typeof setTimeout> | null = null
+
+  /**
+   * Programa un guardado coalescido. Evita reescribir todo el workspace
+   * (incluidos los base64 de medios y presentaciones) en cada tick de un
+   * slider de tema, lo que bloqueaba el proceso principal.
+   */
   private saveToDisk(): void {
+    if (!this.filePath) return
+    if (this.saveTimer) clearTimeout(this.saveTimer)
+    this.saveTimer = setTimeout(() => {
+      this.saveTimer = null
+      this.flushPendingSave()
+    }, 400)
+  }
+
+  /** Escribe de inmediato cualquier guardado pendiente (al salir de la app). */
+  flush(): void {
+    if (this.saveTimer) {
+      clearTimeout(this.saveTimer)
+      this.saveTimer = null
+    }
+    this.flushPendingSave()
+  }
+
+  private flushPendingSave(): void {
     if (!this.filePath) return
     try {
       mkdirSync(dirname(this.filePath), { recursive: true })

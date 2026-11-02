@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
 import type { BibleVersionInfo, BibleVerse } from '../../../../shared/ipc'
 import { suggestVersionName } from '../../../../shared/bibleImport'
 import { parseBibleCitation, resolveBibleCitationBook, versesToSlides } from '../../../../shared/slideHelpers'
@@ -52,19 +52,36 @@ function normalizePredictiveCitation(raw: string): string {
     .replace(/^([1-3]?\s*[a-zA-ZáéíóúñÁÉÍÓÚÑ]+)\s+(\d+)\s+(\d+(?:-\d+)?)$/, '$1 $2:$3')
 }
 
+/**
+ * Vista de la pestaña Bíblica conservada al cambiar de pestaña: al volver
+ * desde Inicio/Medios continúan el libro, capítulo, versículo y la búsqueda
+ * sin tener que repetir la cita.
+ */
+interface RetainedBibleView {
+  selectedBook: string
+  selectedChapter: number
+  bibleVersion: string
+  query: string
+  verses: BibleVerse[]
+  activeVerseNum: number | null
+  recentPassages: string[]
+}
+
+let retainedBibleView: RetainedBibleView | null = null
+
 export function BiblePage({ app }: BiblePageProps) {
   const [testament] = useState<TestamentFilter>('ALL')
   const [bookSearch, setBookSearch] = useState('')
-  const [selectedBook, setSelectedBook] = useState('Salmos')
-  const [selectedChapter, setSelectedChapter] = useState(23)
-  const [query, setQuery] = useState('')
-  const [verses, setVerses] = useState<BibleVerse[]>([])
-  const [activeVerseNum, setActiveVerseNum] = useState<number | null>(null)
+  const [selectedBook, setSelectedBook] = useState(retainedBibleView?.selectedBook ?? 'Salmos')
+  const [selectedChapter, setSelectedChapter] = useState(retainedBibleView?.selectedChapter ?? 23)
+  const [query, setQuery] = useState(retainedBibleView?.query ?? '')
+  const [verses, setVerses] = useState<BibleVerse[]>(() => retainedBibleView?.verses ?? [])
+  const [activeVerseNum, setActiveVerseNum] = useState<number | null>(retainedBibleView?.activeVerseNum ?? null)
   const splitLongVerses = false
   const parallelMode = false as boolean
   const [highlightWord, setHighlightWord] = useState('')
-  const [bibleVersion, setBibleVersion] = useState('rvr1960')
-  const [recentPassages, setRecentPassages] = useState<string[]>([])
+  const [bibleVersion, setBibleVersion] = useState(retainedBibleView?.bibleVersion ?? 'rvr1960')
+  const [recentPassages, setRecentPassages] = useState<string[]>(() => retainedBibleView?.recentPassages ?? [])
 
   const [showImportModal, setShowImportModal] = useState(false)
   const [importName, setImportName] = useState('')
@@ -75,6 +92,20 @@ export function BiblePage({ app }: BiblePageProps) {
   const [versionToDelete, setVersionToDelete] = useState<BibleVersionInfo | null>(null)
 
   const [chapterVerses, setChapterVerses] = useState<BibleVerse[]>([])
+
+  // Conservar la vista mientras la pestaña siga viva en la app: al volver
+  // desde Inicio/Medios se retoma el libro, capítulo, versículo y búsqueda.
+  useEffect(() => {
+    retainedBibleView = {
+      selectedBook,
+      selectedChapter,
+      bibleVersion,
+      query,
+      verses,
+      activeVerseNum,
+      recentPassages
+    }
+  }, [selectedBook, selectedChapter, bibleVersion, query, verses, activeVerseNum, recentPassages])
 
   const builtinVersions = useMemo(() => {
     const fromApi = app.bibleVersions.filter((v) => v.builtIn)
@@ -106,13 +137,21 @@ export function BiblePage({ app }: BiblePageProps) {
   const currentBookSummary =
     app.bibleBooks.find((b) => b.book === selectedBook) ?? app.bibleBooks[0]
 
+  const queryRef = useRef(query)
+  useEffect(() => {
+    queryRef.current = query
+  }, [query])
+
+  // Identidad estable: un push de estado no debe re-ejecutar el efecto inferior.
+  const { getBibleChapter } = app
+
   // Siempre mantener cargados los versículos del capítulo actualmente seleccionado
   useEffect(() => {
     let active = true
-    void app.getBibleChapter({ book: selectedBook, chapter: selectedChapter, version: bibleVersion }).then((res) => {
+    void getBibleChapter({ book: selectedBook, chapter: selectedChapter, version: bibleVersion }).then((res) => {
       if (active) {
         setChapterVerses(res)
-        if (!query.trim()) {
+        if (!queryRef.current.trim()) {
           setVerses(res)
           setActiveVerseNum(null)
         }
@@ -121,7 +160,7 @@ export function BiblePage({ app }: BiblePageProps) {
     return () => {
       active = false
     }
-  }, [app, selectedBook, selectedChapter, bibleVersion])
+  }, [getBibleChapter, selectedBook, selectedChapter, bibleVersion])
 
   const handleVersionChange = async (newVer: string): Promise<void> => {
     setBibleVersion(newVer)
@@ -156,7 +195,31 @@ export function BiblePage({ app }: BiblePageProps) {
     }
   }
 
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    }
+  }, [])
+
+  /** Escritura en el buscador: coalesce las teclas para no recorrer los 66 libros por pulsación. */
+  const handleSearchInput = (text: string): void => {
+    setQuery(text)
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    if (!text.trim()) return
+    searchTimerRef.current = setTimeout(() => {
+      searchTimerRef.current = null
+      const normalized = normalizePredictiveCitation(text)
+      void app.searchBible(normalized, bibleVersion).then((results) => setVerses(results))
+    }, 300)
+  }
+
   const handleSearch = async (text: string): Promise<void> => {
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current)
+      searchTimerRef.current = null
+    }
     setQuery(text)
     if (!text.trim()) return
     const normalized = normalizePredictiveCitation(text)
@@ -369,7 +432,7 @@ export function BiblePage({ app }: BiblePageProps) {
             aria-label="Buscar en la Biblia"
             placeholder="Cita o palabra (ej. jn3:16, jn 3 16, Salmos 23:1-6)... (Enter proyecta directo)"
             value={query}
-            onChange={(e) => void handleSearch(e.target.value)}
+            onChange={(e) => handleSearchInput(e.target.value)}
             onKeyDown={(e) => void handleKeyDownSearch(e)}
             style={{ maxWidth: 420, flex: 1 }}
           />

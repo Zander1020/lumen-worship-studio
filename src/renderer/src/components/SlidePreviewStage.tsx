@@ -359,12 +359,18 @@ export function MotionVideoBackground({
         })
       }
 
-      animId = window.requestAnimationFrame(renderFrame)
+      if (playing) animId = window.requestAnimationFrame(renderFrame)
     }
 
-    animId = window.requestAnimationFrame(renderFrame)
+    if (playing) {
+      animId = window.requestAnimationFrame(renderFrame)
+    } else {
+      // Sin reproducción (p. ej. miniaturas inactivas): un único fotograma fijo
+      // en lugar de mantener un bucle de 60 fps por cada swatch.
+      renderFrame(start + 2000)
+    }
     return () => window.cancelAnimationFrame(animId)
-  }, [isBuiltinMotion, value])
+  }, [isBuiltinMotion, playing, value])
 
   if (isBuiltinMotion) {
     return (
@@ -396,7 +402,7 @@ export function MotionVideoBackground({
       loop={loop}
       muted={muted}
       playsInline
-      preload="auto"
+      preload={playing ? 'auto' : 'metadata'}
       onCanPlay={(e) => {
         if (playing) {
           const v = e.currentTarget
@@ -494,7 +500,7 @@ export function SlidePreviewStage({
       } else {
         setCountdownText(null)
       }
-    }, 500)
+    }, 1000)
     return () => clearInterval(timer)
   }, [live.theme.countdownEndIso])
 

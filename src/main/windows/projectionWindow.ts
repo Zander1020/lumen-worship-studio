@@ -74,13 +74,26 @@ export class ProjectionWindowManager {
     win.setMenu(null)
     this.window = win
 
+    let moveSyncTimer: ReturnType<typeof setTimeout> | null = null
     win.on('closed', () => {
+      if (moveSyncTimer) {
+        clearTimeout(moveSyncTimer)
+        moveSyncTimer = null
+      }
       if (this.window === win) this.window = null
       this.store.updateProjection({ windowOpen: false, fullscreen: false, displayId: null })
     })
     win.on('enter-full-screen', () => this.syncStatus())
     win.on('leave-full-screen', () => this.syncStatus())
-    win.on('moved', () => this.syncStatus())
+    // Arrastrar la ventana emite decenas de eventos por segundo; coalescemos
+    // el sincronizado para no hacer un commit completo del estado en cada frame.
+    win.on('moved', () => {
+      if (moveSyncTimer) clearTimeout(moveSyncTimer)
+      moveSyncTimer = setTimeout(() => {
+        moveSyncTimer = null
+        this.syncStatus()
+      }, 250)
+    })
     win.webContents.on('before-input-event', (_event, input) => {
       if (input.type !== 'keyDown') return
       if (

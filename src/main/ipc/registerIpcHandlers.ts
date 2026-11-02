@@ -101,7 +101,7 @@ export function registerIpcHandlers(ctx: IpcContext): () => void {
 
   handle(IpcChannels.projectionLoadDeck, onlyMain, async (payload) => {
     const request = parseProjectionLoadDeckRequest(payload)
-    const curTheme = ctx.store.get().projection.live.theme
+    const curTheme = ctx.store.getLiveTheme()
     if (curTheme.background.category === 'Culto' || curTheme.background.id.startsWith('culto-') || curTheme.background.id.startsWith('img-')) {
       const savedBg = ctx.workspace.getSettings().theme.background
       if (savedBg.category !== 'Culto' && !savedBg.id.startsWith('culto-') && !savedBg.id.startsWith('img-')) {
@@ -136,7 +136,7 @@ export function registerIpcHandlers(ctx: IpcContext): () => void {
   handle(IpcChannels.projectionUpdateTheme, onlyMain, (payload) => {
     const patch = parseProjectionThemePatch(payload)
     ctx.store.updateTheme(patch)
-    const nextTheme = ctx.store.get().projection.live.theme
+    const nextTheme = ctx.store.getLiveTheme()
     ctx.workspace.updateSettings({ theme: nextTheme })
     return ctx.store.get()
   })

@@ -14,6 +14,49 @@ import { DEFAULT_INITIAL_SONG, DEFAULT_SETTINGS, DEFAULT_THEME } from '../data/d
 
 export type StatusListener = (status: AppStatus) => void
 
+/**
+ * Igualdad profunda con la misma semántica que la comparación anterior por
+ * `JSON.stringify(a) === JSON.stringify(b)`, pero sin serializar nada.
+ *
+ * Ventaja de rendimiento: corta en cuanto dos subárboles comparten referencia,
+ * por lo que comprobar si algo ha cambiado recorre solo lo modificado y no
+ * vuelca en memoria el deck completo (que incluye imágenes en base64).
+ */
+function isSameStateValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  if (typeof a === 'number' && typeof b === 'number' && Number.isNaN(a) && Number.isNaN(b)) return true
+  if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') return false
+  if (a instanceof Date || b instanceof Date) {
+    return a instanceof Date && b instanceof Date && a.getTime() === b.getTime()
+  }
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false
+    for (let i = 0; i < a.length; i++) {
+      // JSON.stringify convierte huecos y `undefined` de un array en `null`
+      if (!isSameStateValue(a[i] ?? null, b[i] ?? null)) return false
+    }
+    return true
+  }
+  if (Object.getPrototypeOf(a) !== Object.prototype || Object.getPrototypeOf(b) !== Object.prototype) {
+    // Tipos exóticos: no deberían existir en AppStatus, pero comparamos bien.
+    return JSON.stringify(a) === JSON.stringify(b)
+  }
+  const aRecord = a as Record<string, unknown>
+  const bRecord = b as Record<string, unknown>
+  let aCount = 0
+  for (const key of Object.keys(aRecord)) {
+    const value = aRecord[key]
+    if (value === undefined) continue // JSON.stringify omitía estas claves
+    aCount++
+    if (!isSameStateValue(value, bRecord[key])) return false
+  }
+  let bCount = 0
+  for (const key of Object.keys(bRecord)) {
+    if (bRecord[key] !== undefined) bCount++
+  }
+  return aCount === bCount
+}
+
 export function createInitialLiveState(): LiveProjectionState {
   const initialSong = DEFAULT_INITIAL_SONG
   return {
@@ -60,6 +103,11 @@ export class StatusStore {
   /** Devuelve una copia para que nadie pueda mutar el estado interno. */
   get(): AppStatus {
     return structuredClone(this.status)
+  }
+
+  /** Devuelve solo el tema en vivo: evita clonar el deck completo (imágenes en base64) para leer unos campos. */
+  getLiveTheme(): ProjectionTheme {
+    return structuredClone(this.status.projection.live.theme)
   }
 
   updateProjection(patch: Partial<ProjectionStatus>): void {
@@ -136,7 +184,7 @@ export class StatusStore {
   }
 
   private commit(next: AppStatus): void {
-    if (JSON.stringify(next) === JSON.stringify(this.status)) return
+    if (isSameStateValue(next, this.status)) return
     this.status = next
     const snapshot = this.get()
     for (const listener of this.listeners) {

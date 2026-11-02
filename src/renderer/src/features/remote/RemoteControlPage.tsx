@@ -6,15 +6,61 @@ export interface RemoteControlPageProps {
   app: UseAppStatus
 }
 
+function isLoopbackUrl(url: string): boolean {
+  return /^https?:\/\/(localhost|127(\.\d{1,3}){3}|\[::1\])(:\d+)?(\/|$)/i.test(url)
+}
+
 export function RemoteControlPage({ app }: RemoteControlPageProps) {
   const info = app.remoteInfo
   const isRunning = info?.running ?? false
+  const lanUrls = (info?.urls ?? []).filter((url) => !isLoopbackUrl(url))
+  const localUrls = (info?.urls ?? []).filter(isLoopbackUrl)
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null)
 
   const handleCopy = (url: string): void => {
     void navigator.clipboard.writeText(url)
     setCopiedUrl(url)
     setTimeout(() => setCopiedUrl(null), 2500)
+  }
+
+  const renderUrlRow = (url: string, forPhone: boolean) => {
+    const pin = info?.pin ?? ''
+    const directUrl = `${url}?pin=${pin}`
+    const stageUrl = `${url}/stage?pin=${pin}`
+    const obsUrl = `${url}/obs?pin=${pin}`
+    return (
+      <li key={url} className="item-row" style={{ flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <strong style={{ color: '#fff' }}>{url}</strong>
+          <div className="item-row__sub">
+            PIN directo: <code>{directUrl}</code>
+          </div>
+          <div className="item-row__sub" style={{ marginTop: 2 }}>
+            Escenario: <code>{stageUrl}</code> · OBS: <code>{obsUrl}</code>
+          </div>
+        </div>
+        <div className="tag-row">
+          <button
+            type="button"
+            className="hly-mini-btn hly-mini-btn--primary"
+            title={
+              forPhone
+                ? 'Copiar dirección con PIN incluido para abrir en el móvil'
+                : 'Copiar dirección local con PIN para abrir en este equipo'
+            }
+            onClick={() => handleCopy(directUrl)}
+          >
+            {copiedUrl === directUrl ? '✓ Copiado' : forPhone ? 'Copiar enlace directo (con PIN)' : 'Copiar enlace local (con PIN)'}
+          </button>
+          <button type="button" className="hly-mini-btn" onClick={() => handleCopy(stageUrl)}>
+            {copiedUrl === stageUrl ? '✓ Copiado' : 'Copiar /stage'}
+          </button>
+          <button type="button" className="hly-mini-btn" onClick={() => handleCopy(obsUrl)}>
+            {copiedUrl === obsUrl ? '✓ Copiado' : 'Copiar /obs'}
+          </button>
+        </div>
+      </li>
+    )
   }
 
   return (
@@ -111,53 +157,29 @@ export function RemoteControlPage({ app }: RemoteControlPageProps) {
 
         <div className="card">
           <h2 className="card__title">Direcciones de acceso en la red Wi-Fi</h2>
-          {isRunning && info && info.urls.length > 0 ? (
+          {isRunning && info && (lanUrls.length > 0 || localUrls.length > 0) ? (
             <>
-              <p className="hint" style={{ marginTop: 0, marginBottom: 10 }}>
-                Abre cualquiera de estos enlaces en el navegador de tu teléfono o tablet (conectado a la misma red Wi-Fi):
-              </p>
-              <ul className="item-list">
-                {info.urls.map((url) => {
-                  const directUrl = `${url}?pin=${info.pin}`
-                  return (
-                    <li key={url} className="item-row" style={{ flexWrap: 'wrap', gap: 8 }}>
-                      <div style={{ flex: 1, minWidth: 200 }}>
-                        <strong style={{ color: '#fff' }}>{url}</strong>
-                        <div className="item-row__sub">
-                          PIN directo: <code>{directUrl}</code>
-                        </div>
-                        <div className="item-row__sub" style={{ marginTop: 2 }}>
-                          Escenario: <code>{url}/stage?pin={info.pin}</code> · OBS: <code>{url}/obs?pin={info.pin}</code>
-                        </div>
-                      </div>
-                      <div className="tag-row">
-                        <button
-                          type="button"
-                          className="hly-mini-btn hly-mini-btn--primary"
-                          title="Copiar dirección con PIN incluido para abrir en el móvil"
-                          onClick={() => handleCopy(directUrl)}
-                        >
-                          {copiedUrl === directUrl ? '✓ Copiado' : 'Copiar enlace directo (con PIN)'}
-                        </button>
-                        <button
-                          type="button"
-                          className="hly-mini-btn"
-                          onClick={() => handleCopy(`${url}/stage?pin=${info.pin}`)}
-                        >
-                          {copiedUrl === `${url}/stage?pin=${info.pin}` ? '✓ Copiado' : 'Copiar /stage'}
-                        </button>
-                        <button
-                          type="button"
-                          className="hly-mini-btn"
-                          onClick={() => handleCopy(`${url}/obs?pin=${info.pin}`)}
-                        >
-                          {copiedUrl === `${url}/obs?pin=${info.pin}` ? '✓ Copiado' : 'Copiar /obs'}
-                        </button>
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
+              {lanUrls.length > 0 && (
+                <>
+                  <p className="hint" style={{ marginTop: 0, marginBottom: 10 }}>
+                    Abre cualquiera de estos enlaces en el navegador de tu teléfono o tablet (conectado a la misma red
+                    Wi-Fi):
+                  </p>
+                  <ul className="item-list">{lanUrls.map((url) => renderUrlRow(url, true))}</ul>
+                </>
+              )}
+
+              {localUrls.length > 0 && (
+                <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px dashed var(--border)' }}>
+                  <p className="hint" style={{ marginTop: 0, marginBottom: 8 }}>
+                    <strong style={{ color: 'var(--accent-strong)' }}>💻 Solo en este equipo (PC):</strong> úsalo para
+                    probar Lumen aquí mismo o como fuente de navegador en OBS.{' '}
+                    <strong style={{ color: 'var(--warn)' }}>No lo abras en el teléfono:</strong> 127.0.0.1 apunta al
+                    propio dispositivo y nunca llegará a Lumen. Desde el móvil usa la IP de la red Wi-Fi de arriba.
+                  </p>
+                  <ul className="item-list">{localUrls.map((url) => renderUrlRow(url, false))}</ul>
+                </div>
+              )}
             </>
           ) : (
             <p className="hint">

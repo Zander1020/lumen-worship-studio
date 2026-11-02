@@ -513,7 +513,7 @@ export function MediaPage({ app }: MediaPageProps) {
                     onDoubleClick={() => applyBackground(bg)}
                   >
                     <div className="media-card__swatch" style={{ ...swatchStyle, position: 'relative', overflow: 'hidden' }}>
-                      {bg.kind === 'video' && <MotionVideoBackground value={bg.value} />}
+                      {bg.kind === 'video' && <MotionVideoBackground value={bg.value} playing={isActive} />}
                       {bg.kind === 'video' && (
                         <span className="badge" style={{ position: 'relative', zIndex: 1 }}>
                           🎬 VIDEO

@@ -38,4 +38,28 @@ describe('StatusStore', () => {
     store.updateMobile({ state: 'waiting' })
     expect(listener).toHaveBeenCalledTimes(4)
   })
+
+  it('omite el commit cuando el cambio no altera el estado real', () => {
+    const store = new StatusStore()
+    const listener = vi.fn()
+    const unsubscribe = store.subscribe(listener)
+
+    // Todos estos valores ya son los iniciales: no deben provocar notificación
+    store.updateProjection({ windowOpen: false })
+    store.updateMobile({ state: 'not-started', connectedClients: 0 })
+    store.setMode('live')
+    store.updateTheme({ fontScale: 100 })
+    expect(listener).not.toHaveBeenCalled()
+
+    // Un cambio real sí notifica, exactamente una vez
+    store.updateProjection({ windowOpen: true })
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect(store.get().projection.windowOpen).toBe(true)
+
+    // Repetir el mismo cambio vuelve a ser un no-op
+    store.updateProjection({ windowOpen: true })
+    expect(listener).toHaveBeenCalledTimes(1)
+
+    unsubscribe()
+  })
 })

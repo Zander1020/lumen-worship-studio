@@ -47,6 +47,12 @@ function bootstrap(): void {
 
   const store = new StatusStore()
   let mainWindow: BrowserWindow | null = null
+  let flushWorkspace: (() => void) | null = null
+
+  // Los guardados del workspace son coalescidos: vaciarlos antes de salir.
+  app.on('before-quit', () => {
+    flushWorkspace?.()
+  })
 
   const projection = new ProjectionWindowManager(store, {
     preloadPath: join(preloadDir, 'projectionWindow.js'),
@@ -134,6 +140,7 @@ function bootstrap(): void {
 
       const workspaceFile = join(app.getPath('userData'), 'lumen-workspace.json')
       const workspace = new WorkspaceStore(workspaceFile)
+      flushWorkspace = () => workspace.flush()
       // Generar siempre un PIN nuevo de 4 dígitos por seguridad cada vez que se abre la app
       const sessionPin = String(Math.floor(1000 + Math.random() * 9000))
       workspace.updateSettings({ remotePin: sessionPin })
