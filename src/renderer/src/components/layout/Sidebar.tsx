@@ -1,6 +1,5 @@
-import { type SyntheticEvent, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { SECTIONS, type SectionId } from '../../../../shared/sections'
-import { parseBibleCitation, resolveBibleCitationBook, versesToSlides } from '../../../../shared/slideHelpers'
 import type { UseAppStatus } from '../../hooks/useAppStatus'
 
 export interface SidebarProps {
@@ -13,10 +12,9 @@ type UiTone = 'neutral-dark' | 'holyrics-gray' | 'neutral-light'
 
 /**
  * Barra superior idéntica a Holyrics con menú de acciones rápido, pestañas operativas agrupadas,
- * cita bíblica directa sin espacios (ej. jn3:16) y persistencia de tono neutro en localStorage.
+ * y persistencia de tono neutro en localStorage.
  */
-export function Sidebar({ active, onSelect, app }: SidebarProps) {
-  const [quickCitation, setQuickCitation] = useState('')
+export function Sidebar({ active, onSelect }: SidebarProps) {
   const [uiTone, setUiTone] = useState<UiTone>(() => {
     try {
       const saved = window.localStorage.getItem('lumen.uiTone')
@@ -42,53 +40,6 @@ export function Sidebar({ active, onSelect, app }: SidebarProps) {
   const HIDDEN_BAR_SECTIONS = new Set<SectionId>(['songs', 'bible', 'projection'])
   const primarySections = SECTIONS.filter((s) => s.group === 'primary' && !HIDDEN_BAR_SECTIONS.has(s.id))
   const utilitySections = SECTIONS.filter((s) => s.group === 'utility' && !HIDDEN_BAR_SECTIONS.has(s.id))
-
-  const handleQuickBibleProject = async (e: SyntheticEvent): Promise<void> => {
-    e.preventDefault()
-    const query = quickCitation.trim()
-    if (!query || !app) return
-    const parsed = parseBibleCitation(query)
-    if (parsed) {
-      const bookName = resolveBibleCitationBook(parsed.rawBook, app.bibleBooks)
-      if (bookName) {
-        const chapterVerses = await app.getBibleChapter({ book: bookName, chapter: parsed.chapter })
-        if (chapterVerses.length > 0) {
-          const targetVerseNum = parsed.verseStart ?? 1
-          const targetIdx = chapterVerses.findIndex((v) => v.verse === targetVerseNum)
-          const effectiveIdx = targetIdx >= 0 ? targetIdx : 0
-          const slides = versesToSlides(chapterVerses)
-          await app.loadProjectionDeck({
-            deckTitle: `${bookName} ${parsed.chapter}`,
-            slides,
-            startIndex: effectiveIdx,
-            openWindow: true
-          })
-          await app.setProjectionMode('live')
-          setQuickCitation('')
-          return
-        }
-      }
-    }
-    const results = await app.searchBible(query)
-    if (results.length > 0) {
-      const first = results[0]
-      const last = results[results.length - 1]
-      const title =
-        first && last
-          ? first.book === last.book && first.chapter === last.chapter && first.verse !== last.verse
-            ? `${first.book} ${first.chapter}:${first.verse}-${last.verse}`
-            : `${first.book} ${first.chapter}:${first.verse}`
-          : query
-      await app.loadProjectionDeck({
-        deckTitle: title,
-        slides: versesToSlides(results),
-        startIndex: 0,
-        openWindow: true
-      })
-      await app.setProjectionMode('live')
-      setQuickCitation('')
-    }
-  }
 
   return (
     <header className="hly-topbar">
@@ -136,22 +87,6 @@ export function Sidebar({ active, onSelect, app }: SidebarProps) {
             ))}
           </ul>
         </nav>
-
-        {app && (
-          <form className="hly-quick-bible" onSubmit={(e) => void handleQuickBibleProject(e)}>
-            <input
-              type="text"
-              className="hly-quick-bible__input"
-              value={quickCitation}
-              onChange={(e) => setQuickCitation(e.target.value)}
-              placeholder="Cita rápida (ej. jn3:16, sal 23 1)..."
-              aria-label="Cita bíblica rápida"
-            />
-            <button type="submit" className="hly-quick-bible__btn" title="Proyectar cita bíblica al instante">
-              ▶
-            </button>
-          </form>
-        )}
 
         <div className="hly-tone-switch" role="group" aria-label="Tono visual de la interfaz">
           <button

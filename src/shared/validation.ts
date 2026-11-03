@@ -1,4 +1,5 @@
 import type {
+  AiProvider,
   AppSettings,
   BackgroundKind,
   BibleChapterRequest,
@@ -554,6 +555,21 @@ export function parseSettingsPatch(input: unknown): Partial<AppSettings> {
       throw new ValidationError('El puerto remoto debe estar entre 1024 y 65535.')
     }
     patch.remotePort = port
+  }
+  if (input['aiProvider'] !== undefined) {
+    const p = input['aiProvider']
+    if (typeof p === 'string' && ['free', 'gemini', 'groq', 'openai', 'deepseek', 'openrouter', 'ollama'].includes(p)) {
+      patch.aiProvider = p as AiProvider
+    }
+  }
+  if (input['aiApiKey'] !== undefined) {
+    patch.aiApiKey = optionalString(input['aiApiKey'], 'aiApiKey', 500)
+  }
+  if (input['aiModel'] !== undefined) {
+    patch.aiModel = optionalString(input['aiModel'], 'aiModel', 100)
+  }
+  if (input['aiCustomUrl'] !== undefined) {
+    patch.aiCustomUrl = optionalString(input['aiCustomUrl'], 'aiCustomUrl', 500)
   }
   if (input['theme'] !== undefined) {
     const current = input['theme']

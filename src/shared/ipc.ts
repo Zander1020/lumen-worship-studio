@@ -1,4 +1,5 @@
 import type {
+  AiProvider,
   AiSuggestionResult,
   AppSettings,
   BackgroundKind,
@@ -248,6 +249,7 @@ export interface YoutubeProgressPayload {
 }
 
 export type {
+  AiProvider,
   AiSuggestionResult,
   AppSettings,
   BackgroundKind,

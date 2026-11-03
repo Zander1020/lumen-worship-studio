@@ -1,6 +1,6 @@
 # ESTADO ACTUAL Y MEMORIA DEL PROYECTO: LUMEN STUDIO
 **Fecha de corte:** 3 de Noviembre de 2026  
-**Última versión en desarrollo:** `v0.1.15` (previa publicada: `v0.1.14`)
+**Última versión en desarrollo:** `v0.1.16` (previa publicada: `v0.1.15`)
 **Repositorio GitHub:** [https://github.com/Zander1020/lumen-worship-studio](https://github.com/Zander1020/lumen-worship-studio)  
 **Release activo:** `v0.1.14` (incluye `latest.yml`, `Lumen-Studio-Setup-0.1.14.exe` y `Lumen-Studio-Setup-0.1.14.exe.blockmap`)  
 **Rama principal:** `main` (al día con `origin/main` y tags `v0.1.8`, `v0.1.9`, `v0.1.10`, `v0.1.11`, `v0.1.12` y `v0.1.13`)
@@ -115,3 +115,17 @@
 - El proyecto se encuentra estable: `npm run check` y `npm run build` en verde, con la versión `v0.1.10` lista para publicar (pendiente de autorización explícita del usuario).
 - Si el usuario reporta mejoras adicionales sobre diseño, animaciones de diapositivas o transiciones de video, mantener siempre la regla de separación de carpetas y aislamiento estricto de documentos.
 
+
+
+### v0.1.16 — Potenciación Extrema de Inteligencia Artificial y Limpieza de Barra Superior
+- **Retiro del buscador rápido de biblia en la barra superior:** Se eliminó el formulario de cita rápida `[Cita rápida (ej. jn3:16)...] [ ▶ ]` en `Sidebar.tsx`. La barra superior ahora muestra exclusivamente los botones de navegación y los conmutadores de tono neutro, logrando una interfaz limpia y despejada.
+- **Servicio de IA Multimodelo (`src/main/services/aiService.ts`):**
+  - Soporte de claves API de ultra alta velocidad: **Google Gemini Flash** (gratuito, <400ms) y **Groq Cloud** (Llama 3.3 70B a 500 tokens/s, gratis).
+  - Soporte para OpenAI, DeepSeek, OpenRouter, Ollama local (100% offline) y modo gratuito Pollinations.
+  - Manejo amigable y claro de cuota/rate-limits (HTTP 402/429) con recomendaciones directas de activación de Gemini/Groq.
+- **Prompt Teológico y Pastoral Experto:** Respuestas bíblicas fundamentadas en las Escrituras (Reina-Valera 1960), cálidas, estructuradas en Markdown y directas al grano sin preámbulos robóticos.
+- **Renovación Completa de la Interfaz de IA (`AiAssistantPage.tsx`):**
+  - Chips de acción rápida con 1 clic: 📖 Versículos Bíblicos, 🎙️ Bosquejo de Sermón, ⛪ Orden de Culto, 🎵 Sugerir Alabanzas, 🙏 Oración Pastoral.
+  - Botón de **📋 Copiar** al portapapeles con confirmación visual rápida.
+  - Botón de **📺 Proyectar** que convierte de inmediato las respuestas o versículos en diapositivas y las proyecta en vivo en la pantalla de la iglesia.
+  - Modal de Ajustes de IA (⚙️) para elegir proveedor, ingresar claves y personalizar modelos.

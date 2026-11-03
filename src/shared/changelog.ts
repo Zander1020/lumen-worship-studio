@@ -8,6 +8,21 @@ export interface ChangelogRelease {
 
 export const APP_CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.1.16',
+    date: '3 de Noviembre de 2026',
+    title: 'Potenciación Extrema de Inteligencia Artificial y Limpieza de Barra Superior',
+    tagline: 'Motor de IA multimodelo ultrarrápido con soporte para Google Gemini y Groq, prompt pastoral experto, proyección con un clic y barra superior limpia.',
+    highlights: [
+      '🧹 Barra Superior Limpia: Retiro completo del buscador rápido bíblico en la barra superior para una interfaz más despejada, elegante y enfocada.',
+      '⚡ Motor de IA Multimodelo Ultrarrápido: Soporte completo para Google Gemini Flash (<0.4s) y Groq Cloud (500 tokens/seg con Llama 3.3 70B) con claves API 100% gratuitas.',
+      '✝️ Prompt Teológico y Pastoral Experto: Respuestas de alta calidad basadas en la Biblia (Reina-Valera 1960), cálidas, estructuradas y directas para pastores, líderes de alabanza y predicadores.',
+      '🎯 Acciones Rápidas con 1 Clic: Chips para generar al instante versículos por tema, bosquejos homiléticos de 3 puntos, cronograma y orden de culto, repertorios de alabanza y oraciones pastorales.',
+      '📺 Proyección Directa a Pantalla: Botón para enviar diapositivas generadas por la IA directamente a la pantalla de proyección en vivo con un solo clic.',
+      '📋 Copiado Rápido al Portapapeles: Copia instantánea de cualquier respuesta o versículo de la IA con confirmación visual.',
+      '⚙️ Modal de Configuración de IA: Ajusta fácilmente tu proveedor favorito (Gratuito, Gemini, Groq, OpenAI, DeepSeek, OpenRouter u Ollama local offline) y tus claves.'
+    ]
+  },
+  {
     version: '0.1.15',
     date: '3 de Noviembre de 2026',
     title: 'Optimización de Descarga de YouTube, Rendimiento y Control Remoto Ultrarrápido',

@@ -234,6 +234,8 @@ export interface LiveProjectionState {
   showClockOnLogo: boolean
 }
 
+export type AiProvider = 'free' | 'gemini' | 'groq' | 'openai' | 'deepseek' | 'openrouter' | 'ollama'
+
 export interface AppSettings {
   churchName: string
   welcomeSubtitle: string
@@ -242,6 +244,10 @@ export interface AppSettings {
   remotePort: number
   remotePin: string
   theme: ProjectionTheme
+  aiProvider?: AiProvider
+  aiApiKey?: string
+  aiModel?: string
+  aiCustomUrl?: string
 }
 
 export interface RemoteServerInfo {
