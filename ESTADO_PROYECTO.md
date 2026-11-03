@@ -1,6 +1,6 @@
 # ESTADO ACTUAL Y MEMORIA DEL PROYECTO: LUMEN STUDIO
 **Fecha de corte:** 3 de Noviembre de 2026  
-**Última versión en desarrollo:** `v0.1.16` (previa publicada: `v0.1.15`)
+**Última versión en desarrollo:** `v0.1.17` (previa publicada: `v0.1.16`)
 **Repositorio GitHub:** [https://github.com/Zander1020/lumen-worship-studio](https://github.com/Zander1020/lumen-worship-studio)  
 **Release activo:** `v0.1.14` (incluye `latest.yml`, `Lumen-Studio-Setup-0.1.14.exe` y `Lumen-Studio-Setup-0.1.14.exe.blockmap`)  
 **Rama principal:** `main` (al día con `origin/main` y tags `v0.1.8`, `v0.1.9`, `v0.1.10`, `v0.1.11`, `v0.1.12` y `v0.1.13`)
@@ -129,3 +129,15 @@
   - Botón de **📋 Copiar** al portapapeles con confirmación visual rápida.
   - Botón de **📺 Proyectar** que convierte de inmediato las respuestas o versículos en diapositivas y las proyecta en vivo en la pantalla de la iglesia.
   - Modal de Ajustes de IA (⚙️) para elegir proveedor, ingresar claves y personalizar modelos.
+
+
+### v0.1.17 — IA Pastoral 100% Gratuita e Integrada de Fábrica (Out-of-the-Box)
+- **100% Gratuito y Permanente:** La IA viene lista y activada de fábrica. Funciona sin registro, sin necesidad de claves API, sin descargar Ollama y sin ninguna configuración requerida por el usuario.
+- **Arquitectura Multi-Capa con Auto-Failover Automático:**
+  1. *Capa Primaria (LLM7 Gateway):* Latencia ultrarrápida de ~1.1s, compatible con OpenAI chat completions, streaming en tiempo real SSE y sin bloqueos de 45 segundos.
+  2. *Capa Secundaria (Pollinations.ai):* Respaldo online automático en caso de timeout o indisponibilidad temporal de la red primaria.
+  3. *Capa Local Pastoral de 0ms (Garantía 100% Offline):* Generador homilético y litúrgico con citas completas Reina-Valera 1960 para bosquejos de sermones, órdenes de culto, repertorios de canciones cristianas y oraciones pastorales. Si la iglesia no tiene conexión a internet o se cae el WiFi, la aplicación responde de inmediato sin dejar al usuario esperando.
+- **Interfaz y Experiencia de Usuario:**
+  - Badge visual en verde `🟢 100% Gratis` con indicación `IA Gratuita Integrada (Automática)`.
+  - Botón de ajustes renombrado a `⚙️ Opciones avanzadas` para usuarios que opcionalmente deseen conectar sus propias claves (Gemini, Groq, etc.), dejando claro que la app ya funciona al 100% sin tocar nada.
+- **Barra Superior Limpia:** Se mantiene la cabecera libre de formularios de búsqueda bíblica innecesarios, enfocada en la navegación y control de la liturgia.

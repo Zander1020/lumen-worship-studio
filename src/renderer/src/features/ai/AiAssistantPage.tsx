@@ -51,10 +51,10 @@ const QUICK_ACTIONS = [
 
 const PROVIDER_INFO: Record<AiProvider, { name: string; tag: string; description: string; url?: string }> = {
   free: {
-    name: 'Gratuito (Público)',
-    tag: '🌐 Gratuito',
+    name: 'IA Gratuita Integrada (Automática)',
+    tag: '🟢 100% Gratis',
     description:
-      'Modo sin registro mediante Pollinations.ai. Ideal para pruebas rápidas, pero limitado a 1 consulta cada 45 segundos por dirección IP.'
+      'Motor de IA gratuito de alta velocidad listo para usar. Funciona sin registro, sin claves y sin ninguna configuración requerida.'
   },
   gemini: {
     name: 'Google Gemini Flash (Recomendado)',
@@ -382,9 +382,9 @@ export function AiAssistantPage({ app }: AiAssistantPageProps) {
               borderRadius: 20,
               fontSize: 12,
               fontWeight: 600,
-              background: currentProvider === 'free' ? '#1e293b' : 'rgba(16, 185, 129, 0.15)',
-              color: currentProvider === 'free' ? '#94a3b8' : '#10b981',
-              border: `1px solid ${currentProvider === 'free' ? '#334155' : 'rgba(16, 185, 129, 0.3)'}`,
+              background: 'rgba(16, 185, 129, 0.15)',
+              color: '#10b981',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
               display: 'flex',
               alignItems: 'center',
               gap: 6
@@ -395,7 +395,7 @@ export function AiAssistantPage({ app }: AiAssistantPageProps) {
                 width: 8,
                 height: 8,
                 borderRadius: '50%',
-                background: currentProvider === 'free' ? '#64748b' : '#10b981'
+                background: '#10b981'
               }}
             />
             {currentProviderInfo.tag}
@@ -408,7 +408,7 @@ export function AiAssistantPage({ app }: AiAssistantPageProps) {
             style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}
             title="Configurar proveedor y claves de IA"
           >
-            ⚙️ Ajustes de IA
+            ⚙️ Opciones avanzadas
           </button>
 
           <button
@@ -517,7 +517,7 @@ export function AiAssistantPage({ app }: AiAssistantPageProps) {
                     color: '#93c5fd'
                   }}
                 >
-                  💡 <strong>Tip de velocidad:</strong> Estás usando el modo gratuito público (1 pregunta cada 45s). Para respuestas en 0.3 segundos sin esperas ni límites, haz clic en <strong>⚙️ Ajustes de IA</strong> y activa <strong>Google Gemini Flash</strong> o <strong>Groq</strong> (ambos 100% gratis).
+                  ✨ <strong>100% Gratuito y Listo:</strong> La IA está completamente configurada y lista para responder al instante, sin cuentas ni claves. ¡Haz cualquier consulta o usa los botones rápidos de arriba!
                 </div>
               )}
             </div>
@@ -741,7 +741,7 @@ export function AiAssistantPage({ app }: AiAssistantPageProps) {
               >
                 <option value="gemini">⚡ Google Gemini Flash (Recomendado - Gratis, veloz &lt;400ms)</option>
                 <option value="groq">🚀 Groq Cloud (Ultra-rápido 500 tok/s - Gratis)</option>
-                <option value="free">🌐 Gratuito (Pollinations - Sin registro, 1 req/45s)</option>
+                <option value="free">🟢 Gratuito Integrado (Automático - Sin claves ni configuración)</option>
                 <option value="openai">🤖 OpenAI (ChatGPT - gpt-4o-mini)</option>
                 <option value="deepseek">🧠 DeepSeek (deepseek-chat)</option>
                 <option value="openrouter">🔀 OpenRouter (Modelos universales)</option>

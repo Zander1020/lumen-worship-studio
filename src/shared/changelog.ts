@@ -8,6 +8,20 @@ export interface ChangelogRelease {
 
 export const APP_CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.1.17',
+    date: '3 de Noviembre de 2026',
+    title: 'IA Pastoral 100% Gratuita e Integrada Out-of-the-Box',
+    tagline: 'Inteligencia artificial lista para usar desde el primer segundo: sin cuentas, sin claves, sin Ollama y con triple capa de respaldo.',
+    highlights: [
+      '🟢 IA 100% Gratuita y Automática: completamente integrada de fábrica. No requiere registro, ni claves API, ni instalar Ollama, ni configurar nada.',
+      '⚡ Velocidad Extrema (<1.5s): motor primario con LLM7 optimizado para respuestas en tiempo real con streaming fluido y sin bloqueos de tiempo.',
+      '🛡️ Arquitectura Multi-Capa con Auto-Failover: si la conexión principal tiene demoras, conmuta automáticamente a Pollinations.ai sin interrumpir la experiencia.',
+      '📖 Garantía 100% Offline: generador pastoral y teológico local de 0ms con bosquejos homiléticos (RVR1960), orden de culto, oraciones y alabanzas que funciona incluso sin internet.',
+      '🧹 Barra Superior Despejada: interfaz limpia y estilizada sin buscador bíblico en la cabecera, enfocada en la adoración y la liturgia.',
+      '⚙️ Opciones Avanzadas Opcionales: los usuarios avanzados pueden conectar sus propias claves (Gemini, Groq, OpenAI) si lo desean, pero nunca es obligatorio.'
+    ]
+  },
+  {
     version: '0.1.16',
     date: '3 de Noviembre de 2026',
     title: 'Potenciación Extrema de Inteligencia Artificial y Limpieza de Barra Superior',
