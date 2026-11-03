@@ -116,13 +116,20 @@ export function YoutubeDownloadModal({
 
   const handlePaste = async (): Promise<void> => {
     try {
-      const text = await navigator.clipboard.readText()
-      if (text) {
-        setUrl(text)
-        void fetchVideoInfo(text)
+      let text = ''
+      if (window.lumen?.readClipboardText) {
+        text = await window.lumen.readClipboardText()
+      } else {
+        text = await navigator.clipboard.readText()
       }
-    } catch {
-      // Si el navegador bloquea clipboard, el usuario puede pegar manualmente
+      if (text && text.trim()) {
+        const clean = text.trim()
+        setUrl(clean)
+        setErrorMessage(null)
+        void fetchVideoInfo(clean)
+      }
+    } catch (err) {
+      console.warn('[youtubeModal] Error al pegar texto:', err)
     }
   }
 
@@ -264,6 +271,14 @@ export function YoutubeDownloadModal({
                   void fetchVideoInfo(url)
                 }
               }}
+              onPaste={(e) => {
+                const text = e.clipboardData.getData('text').trim()
+                if (text) {
+                  setUrl(text)
+                  setErrorMessage(null)
+                  void fetchVideoInfo(text)
+                }
+              }}
               disabled={isDownloading}
               placeholder="https://www.youtube.com/watch?v=... o https://youtu.be/..."
               style={{
@@ -324,6 +339,12 @@ export function YoutubeDownloadModal({
               <img
                 src={info.thumbnailUrl}
                 alt={info.title}
+                onError={(e) => {
+                  const target = e.currentTarget
+                  if (target.src.includes('hqdefault.jpg')) {
+                    target.src = target.src.replace('hqdefault.jpg', 'default.jpg')
+                  }
+                }}
                 style={{
                   width: 110,
                   height: 68,

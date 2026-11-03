@@ -8,6 +8,20 @@ export interface ChangelogRelease {
 
 export const APP_CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.1.15',
+    date: '3 de Noviembre de 2026',
+    title: 'Optimización de Descarga de YouTube, Rendimiento y Control Remoto Ultrarrápido',
+    tagline: 'Corrección de pegado y miniaturas de YouTube, bypass de verificación de bot y respuesta instantánea del control remoto móvil.',
+    highlights: [
+      '📋 Pegado Seguro y Menú Contextual: menú contextual nativo con clic derecho (Deshacer, Cortar, Copiar, Pegar, Seleccionar todo) y botón Pegar 100% funcional con portapapeles de Windows.',
+      '🖼️ Miniaturas de YouTube Visibles: corrección completa de Content Security Policy (CSP) para renderizar carátulas oficiales de YouTube de inmediato al pegar cualquier enlace.',
+      '🛡️ Bypass de Detección de Bot en YouTube: integración de clientes móviles y resolución automática de retos de JavaScript para descargar vídeos sin bloqueos ni requerir inicio de sesión.',
+      '⚡ Control Remoto Ultrarrápido: desactivación del algoritmo de Nagle (TCP_NODELAY) y reconexión inmediata al reanudar el teléfono móvil, eliminando cualquier retraso en la proyección.',
+      '🚀 Alto Rendimiento en PCs de Bajos Recursos: rasterización por GPU, copia cero de memoria y prevención de congelamientos en segundo plano para una reproducción fluida.',
+      '🔍 Mensajes de Error Claros y Amigables: avisos claros cuando un vídeo es privado, eliminado o inexistente en YouTube.'
+    ]
+  },
+  {
     version: '0.1.14',
     date: '2 de Noviembre de 2026',
     title: 'Descarga Directa de Vídeos de YouTube en Medios',

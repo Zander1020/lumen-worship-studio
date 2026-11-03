@@ -1,8 +1,8 @@
 # ESTADO ACTUAL Y MEMORIA DEL PROYECTO: LUMEN STUDIO
-**Fecha de corte:** 2 de Noviembre de 2026  
-**Última versión en desarrollo:** `v0.1.14` (previa publicada: `v0.1.13`)
+**Fecha de corte:** 3 de Noviembre de 2026  
+**Última versión en desarrollo:** `v0.1.15` (previa publicada: `v0.1.14`)
 **Repositorio GitHub:** [https://github.com/Zander1020/lumen-worship-studio](https://github.com/Zander1020/lumen-worship-studio)  
-**Release activo:** `v0.1.13` (incluye `Lumen-Studio-Setup-0.1.13.exe` y `Lumen-Studio-Setup-0.1.13.exe.blockmap`)  
+**Release activo:** `v0.1.14` (incluye `latest.yml`, `Lumen-Studio-Setup-0.1.14.exe` y `Lumen-Studio-Setup-0.1.14.exe.blockmap`)  
 **Rama principal:** `main` (al día con `origin/main` y tags `v0.1.8`, `v0.1.9`, `v0.1.10`, `v0.1.11`, `v0.1.12` y `v0.1.13`)
 
 ---

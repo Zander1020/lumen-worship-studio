@@ -123,6 +123,7 @@ const api: LumenApi = {
   scanSlidesFolder: () =>
     ipcRenderer.invoke(IpcChannels.slidesScanFolder) as Promise<Array<{ fileName: string; filePath: string; ext: string }>>,
   openExternalUrl: (url: string) => ipcRenderer.invoke(IpcChannels.appOpenExternal, url) as Promise<boolean>,
+  readClipboardText: () => ipcRenderer.invoke(IpcChannels.appReadClipboard) as Promise<string>,
   getPathForFile: (file: File) => {
     try {
       if (typeof webUtils.getPathForFile === 'function') {

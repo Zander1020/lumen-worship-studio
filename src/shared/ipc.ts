@@ -97,6 +97,8 @@ export const IpcChannels = {
 
   /** Enlaces externos (WhatsApp, mailto) */
   appOpenExternal: 'app:open-external',
+  /** Lectura segura de texto del portapapeles del sistema */
+  appReadClipboard: 'app:read-clipboard',
 
   /** Ventana principal (minimizar, maximizar/restaurar, cerrar) */
   windowMinimize: 'window:minimize',

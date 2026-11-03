@@ -268,6 +268,13 @@ export class YoutubeDownloadManager {
       '--no-warnings',
       '--newline',
       '--progress',
+      '--no-check-certificates',
+      '--remote-components',
+      'ejs:github',
+      '--js-runtimes',
+      'node',
+      '--extractor-args',
+      'youtube:player_client=web_creator,mweb,android,ios',
       '-f',
       'bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best',
       '--merge-output-format',
@@ -402,14 +409,26 @@ export class YoutubeDownloadManager {
           }
         } else {
           this.cleanPartialFiles(mediaDir, safeBaseName)
-          const errorMsg = stderrBuffer.trim() || `yt-dlp finalizó con código de error ${code}`
+          const rawError = stderrBuffer.trim()
+          let friendlyError = rawError || `yt-dlp finalizó con código de error ${code}`
+          if (/This video is unavailable|Video unavailable/i.test(rawError)) {
+            friendlyError = 'Este vídeo no está disponible en YouTube (puede haber sido eliminado o ser privado).'
+          } else if (/Sign in to confirm you are not a bot/i.test(rawError)) {
+            friendlyError = 'YouTube bloqueó temporalmente la descarga de este enlace por verificación de bot.'
+          } else if (/Private video/i.test(rawError)) {
+            friendlyError = 'Este vídeo es privado en YouTube y no puede descargarse sin credenciales de la cuenta.'
+          } else if (/Premieres in/i.test(rawError)) {
+            friendlyError = 'Este vídeo es un estreno programado en YouTube y aún no se ha transmitido.'
+          } else if (/HTTP Error 404/i.test(rawError)) {
+            friendlyError = 'El vídeo no fue encontrado en YouTube (Error 404).'
+          }
           onProgress({
             url: canonicalUrl,
             percent: 0,
             status: 'error',
-            message: errorMsg
+            message: friendlyError
           })
-          reject(new Error(errorMsg))
+          reject(new Error(friendlyError))
         }
       })
     })

@@ -109,6 +109,7 @@ export interface LumenApi {
 
   /** Apertura de enlaces externos (WhatsApp, correo) */
   readonly openExternalUrl?: (url: string) => Promise<boolean>
+  readonly readClipboardText?: () => Promise<string>
 
   /** Configuración */
   readonly getSettings: () => Promise<AppSettings>

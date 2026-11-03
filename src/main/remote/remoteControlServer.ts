@@ -115,7 +115,13 @@ export class RemoteControlServer {
         schedule: this.workspace.listSchedule()
       })
       for (const client of this.sseClients) {
-        client.write(`data: ${payload}\n\n`)
+        try {
+          client.socket?.setNoDelay(true)
+          client.write(`data: ${payload}\n\n`)
+          ;(client as unknown as { flush?: () => void }).flush?.()
+        } catch {
+          this.sseClients.delete(client)
+        }
       }
     })
 
@@ -229,6 +235,12 @@ export class RemoteControlServer {
   }
 
   handleRequest(req: IncomingMessage, res: ServerResponse): void {
+    try {
+      req.socket.setNoDelay(true)
+      res.socket?.setNoDelay(true)
+    } catch {
+      // ignore
+    }
     const urlObj = new URL(req.url ?? '/', 'http://localhost')
     const pathname = urlObj.pathname
 
@@ -457,11 +469,19 @@ export class RemoteControlServer {
     if (req.method === 'GET' && pathname === '/api/events') {
       res.writeHead(200, {
         'Content-Type': 'text/event-stream; charset=utf-8',
-        'Cache-Control': 'no-cache',
+        'Cache-Control': 'no-cache, no-transform',
+        'X-Accel-Buffering': 'no',
         Connection: 'keep-alive'
       })
       // Reconexión rápida del EventSource (el default del navegador puede tardar mucho)
-      res.write('retry: 3000\n\n')
+      try {
+        res.socket?.setNoDelay(true)
+        res.socket?.setKeepAlive(true, 10000)
+        res.flushHeaders()
+      } catch {
+        // ignore
+      }
+      res.write('retry: 1000\n\n')
       res.write(
         `data: ${JSON.stringify({
           projection: this.statusStore.get().projection,
@@ -1465,9 +1485,34 @@ function renderMobileHtml(): string {
           }
         }
       } catch (e) {
-        // Sin red: el EventSource se reconectará solo (retry 3s)
+        // Sin red: el EventSource se reconectará solo (retry 1s)
       }
     }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        verifyPin();
+        if (!sseSource || sseSource.readyState !== EventSource.OPEN) {
+          initEvents();
+        }
+      }
+    });
+    window.addEventListener('focus', () => {
+      verifyPin();
+      if (!sseSource || sseSource.readyState !== EventSource.OPEN) {
+        initEvents();
+      }
+    });
+    window.addEventListener('pageshow', () => {
+      verifyPin();
+      if (!sseSource || sseSource.readyState !== EventSource.OPEN) {
+        initEvents();
+      }
+    });
+    window.addEventListener('online', () => {
+      verifyPin();
+      initEvents();
+    });
 
     function updateLiveUI(live, schedule, windowOpen) {
       lastLiveState = live;
@@ -1563,7 +1608,8 @@ function renderMobileHtml(): string {
         const res = await fetch('/api/action', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-lumen-pin': currentPin },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(payload),
+          keepalive: true
         });
         if (res.status === 401) {
           promptPin();

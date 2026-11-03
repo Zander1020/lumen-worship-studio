@@ -1,4 +1,4 @@
-import { ipcMain, type BrowserWindow, type IpcMainInvokeEvent } from 'electron'
+import { clipboard, ipcMain, type BrowserWindow, type IpcMainInvokeEvent } from 'electron'
 import { IpcChannels, type AppInfo, type IpcChannel } from '../../shared/ipc'
 import type { PresentationDeck } from '../../shared/models'
 import { parseRawLyricsToStanzas } from '../../shared/slideHelpers'
@@ -342,6 +342,11 @@ export function registerIpcHandlers(ctx: IpcContext): () => void {
       return true
     }
     return false
+  })
+
+  handle(IpcChannels.appReadClipboard, onlyMain, (payload) => {
+    assertNoPayload(payload)
+    return clipboard.readText()
   })
 
   // --- Control remoto móvil ---

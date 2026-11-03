@@ -31,6 +31,10 @@ app.enableSandbox()
 
 // Permitir reproducción automática inmediata de vídeos y fondos sin requerir gesto previo del usuario
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
+app.commandLine.appendSwitch('enable-gpu-rasterization')
+app.commandLine.appendSwitch('enable-zero-copy')
+app.commandLine.appendSwitch('ignore-gpu-blocklist')
+app.commandLine.appendSwitch('disable-renderer-backgrounding')
 
 if (!app.requestSingleInstanceLock()) {
   app.quit()
