@@ -5,13 +5,14 @@ import type { UseAppStatus } from '../../hooks/useAppStatus'
 
 export interface HolyricsLeftDockProps {
   app: UseAppStatus
+  onSelectScheduleItem?: (item: ScheduleItem) => void
 }
 
 /**
  * Columna izquierda de cabina: cronograma del culto (canciones, lecturas,
  * anuncios y diapositivas preparados para el servicio).
  */
-export function HolyricsLeftDock({ app }: HolyricsLeftDockProps) {
+export function HolyricsLeftDock({ app, onSelectScheduleItem }: HolyricsLeftDockProps) {
   const live = app.status?.projection.live
   const [scheduleSearch, setScheduleSearch] = useState('')
   const [isReloading, setIsReloading] = useState(false)
@@ -38,6 +39,16 @@ export function HolyricsLeftDock({ app }: HolyricsLeftDockProps) {
   }, [app.schedule, scheduleSearch])
 
   const projectScheduleItem = (item: ScheduleItem, openWindow = true): void => {
+    onSelectScheduleItem?.(item)
+    if (item.kind === 'song') {
+      const matchedSong =
+        (item.refId ? app.songs.find((s) => s.id === item.refId) : undefined) ??
+        app.songs.find((s) => s.title.trim().toLowerCase() === item.title.trim().toLowerCase())
+      if (matchedSong?.defaultBackgroundId) {
+        const bg = app.media.find((m) => m.id === matchedSong.defaultBackgroundId)
+        if (bg) void app.updateProjectionTheme({ background: bg })
+      }
+    }
     if (item.slides.length === 0) return
     void app.loadProjectionDeck({
       deckTitle: item.title,
@@ -45,10 +56,6 @@ export function HolyricsLeftDock({ app }: HolyricsLeftDockProps) {
       startIndex: 0,
       openWindow
     })
-    void app.setProjectionMode('live')
-    if (openWindow && !app.status?.projection.windowOpen) {
-      void app.openProjection({ target: 'auto' })
-    }
   }
 
   return (

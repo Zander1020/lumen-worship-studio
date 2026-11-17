@@ -176,4 +176,52 @@ describe('App (ventana principal)', () => {
     expect(mockApi.closeProjection).toHaveBeenCalledTimes(1)
     expect(await screen.findByTestId('status-projection')).toHaveTextContent('Cerrada')
   })
+
+  it('al tocar una canción en el panel izquierdo de Culto la muestra en el panel de visualización', async () => {
+    const user = userEvent.setup()
+    const secondSong = DEFAULT_SONGS[1]
+    expect(secondSong).toBeDefined()
+    if (!secondSong) return
+
+    vi.mocked(mockApi.listSchedule).mockResolvedValue([
+      {
+        id: 'sched-song-2',
+        kind: 'song',
+        title: secondSong.title,
+        subtitle: secondSong.author,
+        refId: secondSong.id,
+        slides: secondSong.stanzas.map((st, idx) => ({
+          id: `${secondSong.id}-${idx}`,
+          sourceKind: 'song' as const,
+          sourceTitle: secondSong.title,
+          label: st.label,
+          lines: st.lines,
+          footer: secondSong.title
+        }))
+      }
+    ])
+
+    render(<App />)
+
+    // Navegar primero a otra pestaña (ej. Biblia) para comprobar que vuelve al panel de visualización de música
+    const bibliaTab = await screen.findByRole('tab', { name: /Biblia/i })
+    await user.click(bibliaTab)
+
+    const leftDock = screen.getByRole('complementary', { name: 'Cronograma del culto' })
+    const scheduleRow = await within(leftDock).findByText(secondSong.title)
+    await user.click(scheduleRow)
+
+    expect(
+      await screen.findByText(new RegExp(`PREVISUALIZACIÓN:\\s*${secondSong.title}`, 'i'))
+    ).toBeInTheDocument()
+    const previewList = screen.getByRole('list', { name: 'Párrafos en previsualización' })
+    expect(within(previewList).getAllByRole('listitem').length).toBeGreaterThan(0)
+    expect(mockApi.loadProjectionDeck).toHaveBeenCalledWith(
+      expect.objectContaining({
+        deckTitle: secondSong.title,
+        startIndex: 0,
+        openWindow: true
+      })
+    )
+  })
 })

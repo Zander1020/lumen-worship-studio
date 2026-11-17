@@ -1,6 +1,6 @@
 # ESTADO ACTUAL Y MEMORIA DEL PROYECTO: LUMEN STUDIO
 **Fecha de corte:** 17 de Noviembre de 2026  
-**Última versión en desarrollo:** `v0.1.18` (previa publicada: `v0.1.17`)
+**Última versión en desarrollo:** `v0.1.19` (previa publicada: `v0.1.18`)
 **Repositorio GitHub:** [https://github.com/Zander1020/lumen-worship-studio](https://github.com/Zander1020/lumen-worship-studio)  
 **Release activo:** `v0.1.14` (incluye `latest.yml`, `Lumen-Studio-Setup-0.1.14.exe` y `Lumen-Studio-Setup-0.1.14.exe.blockmap`)  
 **Rama principal:** `main` (al día con `origin/main` y tags `v0.1.8`, `v0.1.9`, `v0.1.10`, `v0.1.11`, `v0.1.12` y `v0.1.13`)
@@ -165,3 +165,8 @@
 - **Integración con Groq AI:**
   - Integración directa con la API key de Groq utilizando el modelo ultra veloz `openai/gpt-oss-120b` con streaming en tiempo real.
 - **Verificación:** `npm run check` en verde (TypeScript Node/Web 0 errores, ESLint 0 errores/warnings, 81/81 pruebas unitarias pasando).
+
+
+### v0.1.19 — Sincronización del Panel de Culto con Previsualización
+- **Culto → Previsualización (`HolyricsLeftDock`, `App.tsx`, `HomePage.tsx`):** Al tocar cualquier canción u otro elemento en el panel izquierdo de Culto, se abre y selecciona de inmediato en el panel central de previsualización (`▣ PREVISUALIZACIÓN`) mostrando todas sus estrofas listas para proyectar, incluso si estabas en otra pestaña o sección.
+- **Verificación:** `npm run check` en verde (83/83 pruebas pasando).

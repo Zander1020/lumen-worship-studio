@@ -1,5 +1,5 @@
 ﻿import { type ChangeEvent, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
-import type { HolyricsImportItem, MediaBackground, PresentationSlide, Song } from '../../../../shared/ipc'
+import type { HolyricsImportItem, MediaBackground, PresentationSlide, ScheduleItem, Song } from '../../../../shared/ipc'
 import {
   autoSplitLongStanzas,
   cleanInternetLyrics,
@@ -17,8 +17,14 @@ import { ConfirmDeleteModal } from '../../components/ConfirmDeleteModal'
 import { MediaPreviewModal } from '../../components/MediaPreviewModal'
 import { YoutubeDownloadModal } from '../../components/YoutubeDownloadModal'
 
+export interface ScheduleSelectionRequest {
+  item: ScheduleItem
+  seq: number
+}
+
 export interface HomePageProps {
   app: UseAppStatus
+  selectedScheduleRequest?: ScheduleSelectionRequest | null
 }
 
 type QuickTab = 'music' | 'bible' | 'presentation' | 'images' | 'text'
@@ -36,7 +42,7 @@ function stanzaTagClass(label: string): string {
  * - Izquierda: Catálogo rápido con pestañas (Música, Biblia 66 libros, Presentaciones PDF/PPTX, Imágenes del Culto, Texto/Alerta rápida).
  * - Derecha: Barra de pestañas de documentos abiertos + Tabla numerada de Párrafos / Versículos / Diapositivas en Previsualización.
  */
-export function HomePage({ app }: HomePageProps) {
+export function HomePage({ app, selectedScheduleRequest = null }: HomePageProps) {
   const [activeTab, setActiveTab] = useState<QuickTab>('music')
   const [songQuery, setSongQuery] = useState('')
   const deferredSongQuery = useDeferredValue(songQuery)
@@ -409,9 +415,11 @@ export function HomePage({ app }: HomePageProps) {
     if (selectedDocId) {
       const match = presentationDecks.find((d) => d.id === selectedDocId || d.title.toLowerCase() === selectedDocId.toLowerCase())
       if (match) return match
+      const openTab = openDocTabs.find((d) => d.id === selectedDocId || d.title.toLowerCase() === selectedDocId.toLowerCase())
+      if (openTab) return openTab
     }
-    return presentationDecks[0] ?? null
-  }, [presentationDecks, selectedDocId])
+    return presentationDecks[0] ?? openDocTabs[0] ?? null
+  }, [presentationDecks, openDocTabs, selectedDocId])
 
   const projectPresentationImmediately = (deck: { title: string; slides: PresentationSlide[] }, openWindow = true): void => {
     setSelectedDocId(deck.title)
@@ -440,17 +448,93 @@ export function HomePage({ app }: HomePageProps) {
     }
   }, [live?.currentIndex, live?.deckTitle])
 
-  // Si se proyecta o carga un documento desde el dock o el cronograma, abrir su pestaña y seleccionarlo
+  const lastHandledScheduleSeqRef = useRef<number>(0)
+  const lastSyncedLiveDeckRef = useRef<string | null>(null)
+
+  // Al tocar una canción u otro elemento en el panel izquierdo de Culto, abrirlo inmediatamente en el panel de visualización
   useEffect(() => {
-    if (!live?.deckTitle || live.slides.length <= 1) return
-    const isDoc =
-      live.slides.some((s) => s.label.toLowerCase().includes('página') || s.label.toLowerCase().includes('diapositiva')) ||
-      live.deckTitle.toLowerCase().includes('pdf') ||
-      live.deckTitle.toLowerCase().includes('powerpoint') ||
-      live.deckTitle.toLowerCase().includes('presentaci')
-    if (isDoc) {
-      const deckTitle = live.deckTitle
-      const slides = live.slides
+    if (!selectedScheduleRequest) return
+    if (selectedScheduleRequest.seq === lastHandledScheduleSeqRef.current) return
+    lastHandledScheduleSeqRef.current = selectedScheduleRequest.seq
+
+    const { item } = selectedScheduleRequest
+    const normTitle = item.title.trim().toLowerCase()
+    const isSongItem = item.kind === 'song' || item.slides[0]?.sourceKind === 'song'
+
+    if (isSongItem) {
+      const matchedSong =
+        (item.refId ? app.songs.find((s) => s.id === item.refId) : undefined) ??
+        app.songs.find((s) => s.title.trim().toLowerCase() === normTitle)
+      if (matchedSong) {
+        queueMicrotask(() => {
+          setSelectedSongId(matchedSong.id)
+          setActiveTab('music')
+          setOpenSongTabIds((prev) =>
+            prev.includes(matchedSong.id) ? prev : [...prev, matchedSong.id].slice(-6)
+          )
+        })
+        return
+      }
+    }
+
+    const cleanMediaName = item.title.replace(/^(vídeo|video|imagen):\s*/i, '').trim().toLowerCase()
+    const matchedMedia = churchMedia.find(
+      (m) => m.name.trim().toLowerCase() === cleanMediaName || m.name.trim().toLowerCase() === normTitle
+    )
+    if (matchedMedia) {
+      queueMicrotask(() => {
+        setSelectedImageId(matchedMedia.id)
+        setActiveTab('images')
+      })
+      return
+    }
+
+    if (item.slides.length > 0) {
+      queueMicrotask(() => {
+        setOpenDocTabs((prev) => {
+          const exists = prev.some((d) => d.title.toLowerCase() === normTitle)
+          if (!exists) {
+            return [...prev, { id: `sched-${item.id}`, title: item.title, slides: item.slides }]
+          }
+          return prev
+        })
+        setSelectedDocId(item.title)
+        setActiveTab('presentation')
+      })
+    }
+  }, [selectedScheduleRequest, app.songs, churchMedia])
+
+  // Si se proyecta o carga una alabanza o documento desde el dock, cronograma o control remoto, mostrarlo en previsualización
+  useEffect(() => {
+    if (!live?.deckTitle || live.slides.length === 0) return
+    if (live.deckTitle === lastSyncedLiveDeckRef.current) return
+    lastSyncedLiveDeckRef.current = live.deckTitle
+
+    const deckTitle = live.deckTitle
+    const slides = live.slides
+    const normTitle = deckTitle.trim().toLowerCase()
+
+    if (slides[0]?.sourceKind === 'song') {
+      const matchedSong = app.songs.find((s) => s.title.trim().toLowerCase() === normTitle)
+      if (matchedSong) {
+        queueMicrotask(() => {
+          setSelectedSongId(matchedSong.id)
+          setActiveTab('music')
+          setOpenSongTabIds((prev) =>
+            prev.includes(matchedSong.id) ? prev : [...prev, matchedSong.id].slice(-6)
+          )
+        })
+        return
+      }
+    }
+
+    if (slides.length <= 1) return
+    const isDocDeck =
+      slides.some((s) => s.label.toLowerCase().includes('página') || s.label.toLowerCase().includes('diapositiva')) ||
+      normTitle.includes('pdf') ||
+      normTitle.includes('powerpoint') ||
+      normTitle.includes('presentaci')
+    if (isDocDeck) {
       queueMicrotask(() => {
         setOpenDocTabs((prev) => {
           const exists = prev.some((d) => d.title === deckTitle)
@@ -463,7 +547,7 @@ export function HomePage({ app }: HomePageProps) {
         setActiveTab('presentation')
       })
     }
-  }, [live?.deckTitle, live?.slides])
+  }, [live?.deckTitle, live?.slides, app.songs])
 
   const previewTitle =
     activeTab === 'music'
@@ -811,6 +895,7 @@ export function HomePage({ app }: HomePageProps) {
                               kind: 'song',
                               title: song.title,
                               subtitle: `${song.author || 'Alabanza'} (${song.stanzas.length} estrofas)`,
+                              refId: song.id,
                               slides: songToSlides(song)
                             })
                           }
@@ -1624,6 +1709,7 @@ export function HomePage({ app }: HomePageProps) {
                 kind: 'song',
                 title: contextMenu.song.title,
                 subtitle: `${contextMenu.song.author || 'Alabanza'} (${contextMenu.song.stanzas.length} estrofas)`,
+                refId: contextMenu.song.id,
                 slides: songToSlides(contextMenu.song)
               })
               setContextMenu(null)

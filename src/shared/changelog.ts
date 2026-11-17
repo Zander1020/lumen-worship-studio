@@ -8,6 +8,17 @@ export interface ChangelogRelease {
 
 export const APP_CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.1.19',
+    date: '17 de Noviembre de 2026',
+    title: 'Sincronización Instantánea del Panel de Culto con Previsualización',
+    tagline: 'Al tocar cualquier alabanza o elemento del panel izquierdo de Culto, se abre de inmediato en el panel central de previsualización listo para proyectar estrofa por estrofa.',
+    highlights: [
+      '📋 Culto → Previsualización Instantánea: al tocar una canción en el panel izquierdo de Culto, ahora se selecciona automáticamente en el panel central de visualización mostrando todas sus estrofas, fijando su pestaña y aplicando su fondo asignado.',
+      '🧭 Cambio Automático de Pestaña/Sección: funciona incluso si estabas en la pestaña de Biblia, Medios, Diapositivas u otra sección de la barra superior.',
+      '📱 Sincronización Total en Vivo: también sincroniza la previsualización al lanzar canciones desde el control remoto móvil y muestra diapositivas de anuncios o elementos personalizados del cronograma.'
+    ]
+  },
+  {
     version: '0.1.18',
     date: '17 de Noviembre de 2026',
     title: 'Búsqueda Rápida Bíblica estilo Holyrics, Rendimiento Extremo y Cita Grande',
