@@ -3,12 +3,13 @@ import lumenLogo from '../assets/lumen.png'
 import type { AppStatus } from '../../../shared/ipc'
 import { SlidePreviewStage } from '../components/SlidePreviewStage'
 
-function useClock(): string {
+function useClock(enabled: boolean): string {
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
+    if (!enabled) return
     const id = window.setInterval(() => setNow(new Date()), 1000)
     return () => window.clearInterval(id)
-  }, [])
+  }, [enabled])
   return now.toLocaleTimeString('es-ES')
 }
 
@@ -21,8 +22,16 @@ const BARS = ['#c0c0c0', '#c0c000', '#00c0c0', '#00c000', '#c000c0', '#c00000', 
  */
 export function ProjectionApp() {
   const api = window.lumenProjection
-  const clock = useClock()
   const [status, setStatus] = useState<AppStatus | null>(null)
+  const live = status?.projection.live
+  const isLiveNormal = Boolean(live && status.projection.content === 'live' && live.mode !== 'test-pattern')
+  const needsClock = !isLiveNormal || Boolean(
+    live?.theme.showOverlayClock ||
+      live?.theme.stageViewMode ||
+      (live?.mode === 'logo' && live.showClockOnLogo) ||
+      live?.theme.countdownEndIso
+  )
+  const clock = useClock(needsClock)
 
   useEffect(() => {
     if (!api) return
@@ -57,7 +66,6 @@ export function ProjectionApp() {
     return () => window.removeEventListener('keydown', onKey)
   }, [api])
 
-  const live = status?.projection.live
   if (live && status.projection.content === 'live' && live.mode !== 'test-pattern') {
     return (
       <SlidePreviewStage

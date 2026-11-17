@@ -1,4 +1,4 @@
-import { type ChangeEvent, type DragEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { type ChangeEvent, type DragEvent, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { exportCatalogToHolyricsJson } from '../../../../shared/holyricsCompat'
 import type { HolyricsImportItem, Song } from '../../../../shared/ipc'
 import {
@@ -56,6 +56,7 @@ Alabaré, alabaré, alabaré a mi Señor.`
 
 export function SongsPage({ app }: SongsPageProps) {
   const [search, setSearch] = useState('')
+  const deferredSearch = useDeferredValue(search)
   const [selectedSongId, setSelectedSongId] = useState<string | null>(null)
   const [stanzaViewMode, setStanzaViewMode] = useState<StanzaViewMode>('table')
   const [editing, setEditing] = useState(false)
@@ -112,7 +113,7 @@ export function SongsPage({ app }: SongsPageProps) {
   const liveEditorStanzas = useMemo(() => parseRawLyricsToStanzas(rawLyrics), [rawLyrics])
 
   const filteredSongs = useMemo(() => {
-    const q = search.trim()
+    const q = deferredSearch.trim()
     if (!q) return app.songs
     return app.songs.filter((song) => {
       const targetText = [
@@ -124,7 +125,7 @@ export function SongsPage({ app }: SongsPageProps) {
       ].join(' ')
       return fuzzyMatchScore(targetText, q) >= 60
     })
-  }, [app.songs, search])
+  }, [app.songs, deferredSearch])
 
   const selectedSong: Song | undefined =
     filteredSongs.find((s) => s.id === selectedSongId) ?? filteredSongs[0]
@@ -293,9 +294,6 @@ export function SongsPage({ app }: SongsPageProps) {
       startIndex,
       ...(openWindow ? { openWindow: true } : {})
     })
-    if (openWindow && !app.status?.projection.windowOpen) {
-      void app.openProjection({ target: 'auto' })
-    }
   }
 
   const addSongToSchedule = (song: Song): void => {

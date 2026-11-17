@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import type { AiProvider } from '../../../../shared/models'
 import type { PresentationSlide } from '../../../../shared/models'
 import type { UseAppStatus } from '../../hooks/useAppStatus'
 
@@ -12,89 +11,10 @@ export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   timestamp: number
+  isError?: boolean
 }
 
-const STORAGE_KEY = 'lumen-ai-chat-history'
-
-const QUICK_ACTIONS = [
-  {
-    icon: '📖',
-    label: 'Versículos Bíblicos',
-    prompt:
-      'Dame 5 versículos clave de fe, fortaleza y consuelo con sus citas bíblicas de la versión Reina-Valera 1960 y una breve aplicación pastoral.'
-  },
-  {
-    icon: '🎙️',
-    label: 'Bosquejo de Sermón',
-    prompt:
-      'Crea un bosquejo homilético de sermón de 3 puntos sobre la gracia y el perdón de Dios, con texto bíblico base, proposición central, desarrollo y conclusión pastoral.'
-  },
-  {
-    icon: '⛪',
-    label: 'Orden de Culto',
-    prompt:
-      'Diseña un programa u orden de culto dominical equilibrado y dinámico de 90 minutos con tiempos sugeridos para alabanza, adoración, ofrendas, mensaje y llamado.'
-  },
-  {
-    icon: '🎵',
-    label: 'Sugerir Alabanzas',
-    prompt:
-      'Sugiéreme 6 alabanzas cristianas contemporáneas categorizadas para apertura/júbilo, adoración íntima y ministración/altar, indicando su tema central.'
-  },
-  {
-    icon: '🙏',
-    label: 'Oración Pastoral',
-    prompt:
-      'Escribe una oración pastoral reverente, bíblica y profunda para bendecir a la congregación al iniciar o concluir el servicio de adoración.'
-  }
-]
-
-const PROVIDER_INFO: Record<AiProvider, { name: string; tag: string; description: string; url?: string }> = {
-  free: {
-    name: 'IA Gratuita Integrada (Automática)',
-    tag: '🟢 100% Gratis',
-    description:
-      'Motor de IA gratuito de alta velocidad listo para usar. Funciona sin registro, sin claves y sin ninguna configuración requerida.'
-  },
-  gemini: {
-    name: 'Google Gemini Flash (Recomendado)',
-    tag: '⚡ Gemini Flash',
-    description:
-      'Clave gratuita en Google AI Studio (https://aistudio.google.com). Respuestas en menos de 0.4s, alta sabiduría bíblica y sin tarjeta de crédito.',
-    url: 'https://aistudio.google.com'
-  },
-  groq: {
-    name: 'Groq Cloud (LPU Ultra-rápido)',
-    tag: '🚀 Groq Ultra-rápido',
-    description:
-      'Clave gratuita en Groq Console (https://console.groq.com). Velocidad de 500+ tokens por segundo con Llama 3.3 70B.',
-    url: 'https://console.groq.com'
-  },
-  openai: {
-    name: 'OpenAI (ChatGPT)',
-    tag: '🤖 OpenAI',
-    description: 'Requiere clave de OpenAI (https://platform.openai.com). Por defecto utiliza gpt-4o-mini.',
-    url: 'https://platform.openai.com'
-  },
-  deepseek: {
-    name: 'DeepSeek',
-    tag: '🧠 DeepSeek',
-    description: 'Requiere clave de DeepSeek API (https://platform.deepseek.com). Utiliza deepseek-chat.',
-    url: 'https://platform.deepseek.com'
-  },
-  openrouter: {
-    name: 'OpenRouter',
-    tag: '🔀 OpenRouter',
-    description: 'Acceso a múltiples modelos abiertos y gratuitos (https://openrouter.ai).',
-    url: 'https://openrouter.ai'
-  },
-  ollama: {
-    name: 'Ollama (Local / Sin Internet)',
-    tag: '💻 Ollama Local',
-    description:
-      'Ejecuta modelos en tu computador localmente de forma privada y 100% offline (http://localhost:11434).'
-  }
-}
+const STORAGE_KEY = 'lumen-groq-chat-history'
 
 function loadHistory(): ChatMessage[] {
   try {
@@ -107,7 +27,7 @@ function loadHistory(): ChatMessage[] {
         !!m &&
         typeof m === 'object' &&
         typeof (m as ChatMessage).id === 'string' &&
-        typeof (m as ChatMessage).role === 'string' &&
+        ((m as ChatMessage).role === 'user' || (m as ChatMessage).role === 'assistant') &&
         typeof (m as ChatMessage).content === 'string'
     )
   } catch {
@@ -119,7 +39,7 @@ function saveHistory(messages: ChatMessage[]): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(messages))
   } catch {
-    // ignorar errores de almacenamiento
+    // Ignorar errores de cuota/almacenamiento
   }
 }
 
@@ -129,16 +49,10 @@ export function AiAssistantPage({ app }: AiAssistantPageProps) {
   const [loading, setLoading] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [projectedId, setProjectedId] = useState<string | null>(null)
-  const [isConfigOpen, setIsConfigOpen] = useState(false)
-  const [showKey, setShowKey] = useState(false)
-
-  // Estados locales para el modal de configuración
-  const [selectedProvider, setSelectedProvider] = useState<AiProvider>(() => app?.settings?.aiProvider ?? 'free')
-  const [apiKeyInput, setApiKeyInput] = useState<string>(() => app?.settings?.aiApiKey ?? '')
-  const [modelInput, setModelInput] = useState<string>(() => app?.settings?.aiModel ?? '')
-  const [customUrlInput, setCustomUrlInput] = useState<string>(() => app?.settings?.aiCustomUrl ?? '')
+  const [confirmClear, setConfirmClear] = useState(false)
 
   const chatContainerRef = useRef<HTMLDivElement>(null)
+  const unsubscribeRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     saveHistory(messages)
@@ -150,38 +64,47 @@ export function AiAssistantPage({ app }: AiAssistantPageProps) {
     }
   }, [messages, loading])
 
-  // Sincronizar configuración actual si app.settings cambia
   useEffect(() => {
-    if (app?.settings) {
-      if (app.settings.aiProvider) setSelectedProvider(app.settings.aiProvider)
-      if (app.settings.aiApiKey !== undefined) setApiKeyInput(app.settings.aiApiKey)
-      if (app.settings.aiModel !== undefined) setModelInput(app.settings.aiModel)
-      if (app.settings.aiCustomUrl !== undefined) setCustomUrlInput(app.settings.aiCustomUrl)
-    }
-  }, [app?.settings])
+    if (!confirmClear) return
+    const timer = setTimeout(() => setConfirmClear(false), 3000)
+    return () => clearTimeout(timer)
+  }, [confirmClear])
 
-  const currentProvider: AiProvider = app?.settings?.aiProvider ?? 'free'
-  const currentProviderInfo = PROVIDER_INFO[currentProvider]
+  useEffect(() => {
+    return () => {
+      unsubscribeRef.current?.()
+      unsubscribeRef.current = null
+    }
+  }, [])
 
   const handleSendPrompt = async (textToSend: string): Promise<void> => {
     const text = textToSend.trim()
     if (!text || loading) return
 
-    const userMsgId = `user-${Date.now()}`
-    const assistantMsgId = `ai-${Date.now() + 1}`
+    const now = Date.now()
+    const userMsgId = `user-${now}`
+    const assistantMsgId = `ai-${now + 1}`
 
     const nextMessages: ChatMessage[] = [
       ...messages,
-      { id: userMsgId, role: 'user', content: text, timestamp: Date.now() }
+      { id: userMsgId, role: 'user', content: text, timestamp: now }
     ]
 
     setMessages(nextMessages)
     setInput('')
     setLoading(true)
 
+    const payloadMessages = nextMessages
+      .filter((m) => !m.isError && m.content.trim().length > 0)
+      .map((m) => ({
+        role: m.role,
+        content: m.content
+      }))
+
     const api = (
       window as unknown as {
         lumen?: {
+          chatWithAI?: (m: { role: string; content: string }[]) => Promise<string>
           chatWithAIStream?: (r: {
             messages: { role: string; content: string }[]
             requestId: string
@@ -193,92 +116,118 @@ export function AiAssistantPage({ app }: AiAssistantPageProps) {
       }
     ).lumen
 
-    const streamFn = api?.chatWithAIStream
-    const listenFn = api?.onAIChatChunk
+    const updateAssistantMessage = (
+      updater: (current: ChatMessage) => ChatMessage
+    ): void => {
+      setMessages((prev) =>
+        prev.map((msg) => (msg.id === assistantMsgId ? updater(msg) : msg))
+      )
+    }
 
-    if (streamFn && listenFn) {
-      const requestId = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : String(Date.now())
+    if (api?.chatWithAIStream && api.onAIChatChunk) {
+      const requestId =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : String(Date.now())
 
       setMessages([
         ...nextMessages,
         { id: assistantMsgId, role: 'assistant', content: '', timestamp: Date.now() }
       ])
 
-      const unsubscribe = listenFn((payload) => {
+      const cleanupStream = (): void => {
+        unsubscribeRef.current?.()
+        unsubscribeRef.current = null
+      }
+
+      const unsubscribe = api.onAIChatChunk((payload) => {
         if (payload.requestId !== requestId) return
 
         if (payload.error) {
-          setMessages((prev) => {
-            const copy = [...prev]
-            const last = copy[copy.length - 1]
-            if (last && last.role === 'assistant') {
-              const errText = payload.error || 'Error desconocido'; last.content = last.content ? (last.content + '\n\n' + errText) : errText;
-            }
-            return copy
-          })
+          const errText = payload.error || 'Error desconocido al consultar Groq.'
+          updateAssistantMessage((current) => ({
+            ...current,
+            content: current.content ? `${current.content}\n\n${errText}` : errText,
+            isError: true
+          }))
           setLoading(false)
-          unsubscribe()
+          cleanupStream()
           return
         }
 
         if (payload.chunk) {
-          setMessages((prev) => {
-            const copy = [...prev]
-            const last = copy[copy.length - 1]
-            if (last && last.role === 'assistant') {
-              last.content += payload.chunk
-            }
-            return copy
-          })
+          updateAssistantMessage((current) => ({
+            ...current,
+            content: current.content + payload.chunk
+          }))
         }
 
         if (payload.done) {
           setLoading(false)
-          unsubscribe()
+          cleanupStream()
         }
       })
 
+      unsubscribeRef.current = unsubscribe
+
       try {
-        const payloadMessages = nextMessages.map((m) => ({
-          role: m.role,
-          content: m.content
-        }))
-        await streamFn({ messages: payloadMessages, requestId })
+        await api.chatWithAIStream({ messages: payloadMessages, requestId })
       } catch (err) {
-        setMessages((prev) => {
-          const copy = [...prev]
-          const last = copy[copy.length - 1]
-          if (last && last.role === 'assistant') {
-            last.content = `Error: ${err instanceof Error ? err.message : String(err)}`
-          }
-          return copy
-        })
+        const msg = err instanceof Error ? err.message : String(err)
+        updateAssistantMessage((current) => ({
+          ...current,
+          content: `Error: ${msg}`,
+          isError: true
+        }))
         setLoading(false)
-        unsubscribe()
+        cleanupStream()
       }
-    } else {
-      // Fallback
-      setMessages([
-        ...nextMessages,
-        {
-          id: assistantMsgId,
-          role: 'assistant',
-          content: 'No se pudo conectar con el canal de streaming del proceso principal.',
-          timestamp: Date.now()
-        }
-      ])
-      setLoading(false)
+      return
     }
+
+    if (api?.chatWithAI) {
+      try {
+        const reply = await api.chatWithAI(payloadMessages)
+        setMessages([
+          ...nextMessages,
+          { id: assistantMsgId, role: 'assistant', content: reply, timestamp: Date.now() }
+        ])
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        setMessages([
+          ...nextMessages,
+          { id: assistantMsgId, role: 'assistant', content: `Error: ${msg}`, timestamp: Date.now(), isError: true }
+        ])
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
+    setMessages([
+      ...nextMessages,
+      {
+        id: assistantMsgId,
+        role: 'assistant',
+        content: 'No se encontró conexión con el proceso principal de Electron.',
+        timestamp: Date.now(),
+        isError: true
+      }
+    ])
+    setLoading(false)
   }
 
   const handleClear = (): void => {
-    if (confirm('¿Deseas vaciar el historial de conversación con la IA?')) {
-      setMessages([])
-      try {
-        localStorage.removeItem(STORAGE_KEY)
-      } catch {
-        // ignorar
-      }
+    if (!confirmClear) {
+      setConfirmClear(true)
+      return
+    }
+    setConfirmClear(false)
+    setMessages([])
+    try {
+      localStorage.removeItem(STORAGE_KEY)
+    } catch {
+      // ignorar
     }
   }
 
@@ -302,7 +251,6 @@ export function AiAssistantPage({ app }: AiAssistantPageProps) {
   const handleProject = async (id: string, text: string): Promise<void> => {
     if (!app) return
 
-    // Convertir el texto de la IA en diapositivas limpias dividiendo por párrafos o listas
     const blocks = text
       .split(/\n\s*\n+/)
       .map((b) => b.trim())
@@ -319,7 +267,7 @@ export function AiAssistantPage({ app }: AiAssistantPageProps) {
       return {
         id: `ai-slide-${Date.now()}-${idx + 1}`,
         sourceKind: 'custom',
-        sourceTitle: 'Asistente Teológico / IA',
+        sourceTitle: 'Groq AI',
         label: `Diapositiva ${idx + 1}`,
         lines: cleanLines,
         footer: 'Lumen Worship Studio'
@@ -327,7 +275,7 @@ export function AiAssistantPage({ app }: AiAssistantPageProps) {
     })
 
     await app.loadProjectionDeck({
-      deckTitle: 'Mensaje Pastoral / IA',
+      deckTitle: 'Chat Groq AI',
       slides,
       startIndex: 0,
       openWindow: true
@@ -338,20 +286,12 @@ export function AiAssistantPage({ app }: AiAssistantPageProps) {
     setTimeout(() => setProjectedId(null), 2500)
   }
 
-  const handleSaveConfig = async (): Promise<void> => {
-    if (!app) return
-    await app.updateSettings({
-      aiProvider: selectedProvider,
-      aiApiKey: apiKeyInput.trim(),
-      aiModel: modelInput.trim(),
-      aiCustomUrl: customUrlInput.trim()
-    })
-    setIsConfigOpen(false)
-  }
+  const lastMessage = messages[messages.length - 1]
+  const waitingFirstChunk =
+    loading && !(lastMessage?.role === 'assistant' && lastMessage.content.length > 0)
 
   return (
     <section className="page hly-page" aria-labelledby="ai-page-title" style={{ padding: 16 }}>
-      {/* Barra de título y estado de la IA */}
       <header
         className="card"
         style={{
@@ -370,12 +310,11 @@ export function AiAssistantPage({ app }: AiAssistantPageProps) {
             Inteligencia artificial
           </h1>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted, #94a3b8)' }}>
-            Respuestas bíblicas, bosquejos de sermones, oraciones y liturgia al instante para tu iglesia.
+            Chat directo conectado con Groq AI.
           </p>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {/* Badge del proveedor activo */}
           <div
             style={{
               padding: '6px 12px',
@@ -398,78 +337,29 @@ export function AiAssistantPage({ app }: AiAssistantPageProps) {
                 background: '#10b981'
               }}
             />
-            {currentProviderInfo.tag}
+            ⚡ Groq AI
           </div>
-
-          <button
-            type="button"
-            className="button button--secondary"
-            onClick={() => setIsConfigOpen(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}
-            title="Configurar proveedor y claves de IA"
-          >
-            ⚙️ Opciones avanzadas
-          </button>
 
           <button
             type="button"
             className="button"
             onClick={handleClear}
-            disabled={messages.length === 0}
+            disabled={messages.length === 0 || loading}
             style={{ fontSize: 13 }}
             title="Borrar conversación actual"
           >
-            🗑️ Limpiar
+            {confirmClear ? '¿Confirmar limpiar?' : '🗑️ Limpiar'}
           </button>
         </div>
       </header>
 
-      {/* Chips de Acción Rápida Teológica */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 8,
-          overflowX: 'auto',
-          paddingBottom: 8,
-          marginBottom: 10
-        }}
-      >
-        {QUICK_ACTIONS.map((action, idx) => (
-          <button
-            key={idx}
-            type="button"
-            className="hly-mini-btn"
-            onClick={() => void handleSendPrompt(action.prompt)}
-            disabled={loading}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '6px 12px',
-              borderRadius: 16,
-              background: 'var(--bg-panel, #161e2e)',
-              border: '1px solid var(--border, #2a3346)',
-              color: 'var(--text, #e2e8f0)',
-              fontSize: 12,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap'
-            }}
-            title={action.prompt}
-          >
-            <span>{action.icon}</span>
-            <span>{action.label}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Contenedor principal de mensajes */}
       <div
         className="card"
         style={{
           display: 'flex',
           flexDirection: 'column',
-          height: 'calc(100vh - 290px)',
-          minHeight: 380,
+          height: 'calc(100vh - 235px)',
+          minHeight: 400,
           background: 'var(--bg-panel, #0f1419)',
           border: '1px solid var(--border, #2a3346)',
           borderRadius: 8,
@@ -492,34 +382,18 @@ export function AiAssistantPage({ app }: AiAssistantPageProps) {
               style={{
                 margin: 'auto',
                 textAlign: 'center',
-                maxWidth: 520,
+                maxWidth: 460,
                 padding: 24,
                 color: 'var(--text-muted, #94a3b8)'
               }}
             >
-              <div style={{ fontSize: 44, marginBottom: 12 }}>✝️</div>
+              <div style={{ fontSize: 38, marginBottom: 12 }}>✦</div>
               <h2 style={{ fontSize: 18, color: '#f8fafc', marginBottom: 8, fontWeight: 600 }}>
-                ¿En qué puedo ayudarte en tu ministerio hoy?
+                Chat con Groq AI
               </h2>
-              <p style={{ fontSize: 13, lineHeight: 1.5, marginBottom: 16 }}>
-                Pregunta por versículos por tema, pide un bosquejo para tu mensaje, diseña la liturgia del culto o
-                sugiere cánticos de adoración. Selecciona una sugerencia arriba o escribe abajo.
+              <p style={{ fontSize: 13, lineHeight: 1.5, margin: 0 }}>
+                Escribe tu mensaje abajo para comenzar a conversar.
               </p>
-              {currentProvider === 'free' && (
-                <div
-                  style={{
-                    background: 'rgba(59, 130, 246, 0.1)',
-                    border: '1px solid rgba(59, 130, 246, 0.3)',
-                    borderRadius: 8,
-                    padding: 12,
-                    fontSize: 12,
-                    textAlign: 'left',
-                    color: '#93c5fd'
-                  }}
-                >
-                  ✨ <strong>100% Gratuito y Listo:</strong> La IA está completamente configurada y lista para responder al instante, sin cuentas ni claves. ¡Haz cualquier consulta o usa los botones rápidos de arriba!
-                </div>
-              )}
             </div>
           )}
 
@@ -540,11 +414,19 @@ export function AiAssistantPage({ app }: AiAssistantPageProps) {
                   style={{
                     padding: isUser ? '10px 14px' : '14px 18px',
                     borderRadius: isUser ? '14px 14px 2px 14px' : '14px 14px 14px 2px',
-                    background: isUser ? 'var(--accent, #2563eb)' : '#1a2234',
-                    color: isUser ? '#ffffff' : '#f1f5f9',
+                    background: isUser
+                      ? 'var(--accent, #2563eb)'
+                      : m.isError
+                        ? 'rgba(239, 68, 68, 0.14)'
+                        : '#1a2234',
+                    color: isUser ? '#ffffff' : m.isError ? '#fca5a5' : '#f1f5f9',
                     fontSize: 14,
                     lineHeight: 1.6,
-                    border: isUser ? 'none' : '1px solid #2d3748',
+                    border: isUser
+                      ? 'none'
+                      : m.isError
+                        ? '1px solid rgba(239, 68, 68, 0.4)'
+                        : '1px solid #2d3748',
                     whiteSpace: 'pre-wrap',
                     wordBreak: 'break-word',
                     boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
@@ -553,8 +435,7 @@ export function AiAssistantPage({ app }: AiAssistantPageProps) {
                   {m.content || (loading && !isUser ? '…' : '')}
                 </div>
 
-                {/* Acciones para mensajes del asistente */}
-                {!isUser && m.content && (
+                {!isUser && !m.isError && m.content && (
                   <div style={{ display: 'flex', gap: 8, paddingLeft: 4, marginTop: 2 }}>
                     <button
                       type="button"
@@ -599,7 +480,7 @@ export function AiAssistantPage({ app }: AiAssistantPageProps) {
             )
           })}
 
-          {loading && (
+          {waitingFirstChunk && (
             <div
               style={{
                 alignSelf: 'flex-start',
@@ -617,18 +498,17 @@ export function AiAssistantPage({ app }: AiAssistantPageProps) {
               <span className="hly-spinner" style={{ display: 'inline-block' }}>
                 ⏳
               </span>
-              <span>Preparando respuesta pastoral con IA…</span>
+              <span>Esperando respuesta de Groq…</span>
             </div>
           )}
         </div>
 
-        {/* Barra de entrada de texto */}
         <div style={{ marginTop: 12 }}>
           <div style={{ display: 'flex', gap: 8 }}>
             <input
               type="text"
-              aria-label="Pregunta pastoral o bíblica para la IA"
-              placeholder="Haz una pregunta bíblica, pide un bosquejo o sugiere cánticos… (Enter para enviar)"
+              aria-label="Mensaje para Groq AI"
+              placeholder="Escribe tu mensaje para Groq… (Enter para enviar)"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -663,243 +543,13 @@ export function AiAssistantPage({ app }: AiAssistantPageProps) {
               color: 'var(--text-muted, #64748b)'
             }}
           >
+            <span>Motor: Groq • openai/gpt-oss-120b</span>
             <span>
-              Proveedor: <strong>{currentProviderInfo.name}</strong> • Especializado en doctrina y predicación
+              Atajo: Presiona <strong>Enter</strong> para enviar
             </span>
-            <span>Atajo: Presiona <strong>Enter</strong> para enviar</span>
           </div>
         </div>
       </div>
-
-      {/* Modal / Diálogo de Configuración de IA */}
-      {isConfigOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="ai-settings-dialog-title"
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.75)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: 16
-          }}
-        >
-          <div
-            className="card"
-            style={{
-              width: '100%',
-              maxWidth: 580,
-              background: '#0f172a',
-              borderRadius: 10,
-              border: '1px solid #334155',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)',
-              padding: 20,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 16
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 id="ai-settings-dialog-title" style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#f8fafc' }}>
-                ⚙️ Configuración del Motor de IA
-              </h2>
-              <button
-                type="button"
-                className="button button--secondary"
-                onClick={() => setIsConfigOpen(false)}
-                style={{ padding: '4px 8px', fontSize: 13 }}
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Selector de Proveedor */}
-            <div>
-              <label htmlFor="ai-provider-select" style={{ display: 'block', fontSize: 13, marginBottom: 6, fontWeight: 500, color: '#e2e8f0' }}>
-                Proveedor de Inteligencia Artificial:
-              </label>
-              <select
-                id="ai-provider-select"
-                value={selectedProvider}
-                onChange={(e) => setSelectedProvider(e.target.value as AiProvider)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: 6,
-                  background: '#1e293b',
-                  border: '1px solid #475569',
-                  color: '#f8fafc',
-                  fontSize: 14
-                }}
-              >
-                <option value="gemini">⚡ Google Gemini Flash (Recomendado - Gratis, veloz &lt;400ms)</option>
-                <option value="groq">🚀 Groq Cloud (Ultra-rápido 500 tok/s - Gratis)</option>
-                <option value="free">🟢 Gratuito Integrado (Automático - Sin claves ni configuración)</option>
-                <option value="openai">🤖 OpenAI (ChatGPT - gpt-4o-mini)</option>
-                <option value="deepseek">🧠 DeepSeek (deepseek-chat)</option>
-                <option value="openrouter">🔀 OpenRouter (Modelos universales)</option>
-                <option value="ollama">💻 Ollama (Local en tu PC - 100% offline)</option>
-              </select>
-            </div>
-
-            {/* Caja de Ayuda del Proveedor */}
-            <div
-              style={{
-                background: 'rgba(30, 41, 59, 0.7)',
-                border: '1px solid #334155',
-                borderRadius: 6,
-                padding: 12,
-                fontSize: 12,
-                color: '#cbd5e1',
-                lineHeight: 1.5
-              }}
-            >
-              <p style={{ margin: '0 0 6px 0' }}>{PROVIDER_INFO[selectedProvider].description}</p>
-              {PROVIDER_INFO[selectedProvider].url && (
-                <p style={{ margin: 0 }}>
-                  👉 Puedes obtener tu clave en:{' '}
-                  <a
-                    href={PROVIDER_INFO[selectedProvider].url}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ color: '#60a5fa', textDecoration: 'underline' }}
-                  >
-                    {PROVIDER_INFO[selectedProvider].url}
-                  </a>
-                </p>
-              )}
-            </div>
-
-            {/* Campo Clave API (si aplica) */}
-            {selectedProvider !== 'free' && selectedProvider !== 'ollama' && (
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <label htmlFor="ai-api-key-input" style={{ fontSize: 13, fontWeight: 500, color: '#e2e8f0' }}>
-                    Clave API ({PROVIDER_INFO[selectedProvider].tag}):
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setShowKey(!showKey)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#60a5fa',
-                      cursor: 'pointer',
-                      fontSize: 12
-                    }}
-                  >
-                    {showKey ? 'Ocultar' : 'Mostrar'}
-                  </button>
-                </div>
-                <input
-                  id="ai-api-key-input"
-                  type={showKey ? 'text' : 'password'}
-                  placeholder="Pega tu API Key aquí..."
-                  value={apiKeyInput}
-                  onChange={(e) => setApiKeyInput(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: 6,
-                    background: '#1e293b',
-                    border: '1px solid #475569',
-                    color: '#f8fafc',
-                    fontSize: 14,
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-            )}
-
-            {/* Campo URL personalizado para Ollama */}
-            {selectedProvider === 'ollama' && (
-              <div>
-                <label htmlFor="ai-custom-url-input" style={{ display: 'block', fontSize: 13, marginBottom: 6, fontWeight: 500, color: '#e2e8f0' }}>
-                  URL del servidor Ollama:
-                </label>
-                <input
-                  id="ai-custom-url-input"
-                  type="text"
-                  placeholder="http://localhost:11434"
-                  value={customUrlInput}
-                  onChange={(e) => setCustomUrlInput(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: 6,
-                    background: '#1e293b',
-                    border: '1px solid #475569',
-                    color: '#f8fafc',
-                    fontSize: 14,
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-            )}
-
-            {/* Campo Modelo (Opcional) */}
-            <div>
-              <label htmlFor="ai-model-input" style={{ display: 'block', fontSize: 13, marginBottom: 6, fontWeight: 500, color: '#e2e8f0' }}>
-                Modelo específico (opcional):
-              </label>
-              <input
-                id="ai-model-input"
-                type="text"
-                placeholder={
-                  selectedProvider === 'gemini'
-                    ? 'gemini-2.0-flash (predeterminado)'
-                    : selectedProvider === 'groq'
-                      ? 'llama-3.3-70b-versatile (predeterminado)'
-                      : selectedProvider === 'openai'
-                        ? 'gpt-4o-mini (predeterminado)'
-                        : selectedProvider === 'deepseek'
-                          ? 'deepseek-chat'
-                          : selectedProvider === 'ollama'
-                            ? 'llama3.2'
-                            : 'Automático'
-                }
-                value={modelInput}
-                onChange={(e) => setModelInput(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: 6,
-                  background: '#1e293b',
-                  border: '1px solid #475569',
-                  color: '#f8fafc',
-                  fontSize: 14,
-                  boxSizing: 'border-box'
-                }}
-              />
-            </div>
-
-            {/* Botones de acción del diálogo */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
-              <button
-                type="button"
-                className="button button--secondary"
-                onClick={() => setIsConfigOpen(false)}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="button button--primary"
-                onClick={() => void handleSaveConfig()}
-              >
-                Guardar Configuración
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </section>
   )
 }

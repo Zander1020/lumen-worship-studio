@@ -1,54 +1,59 @@
-import { describe, expect, it } from 'vitest'
-import { AiService, PASTORAL_SYSTEM_PROMPT } from './aiService'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  AiService,
+  GROQ_CHAT_COMPLETIONS_URL,
+  GROQ_DEFAULT_MODEL,
+  GROQ_SYSTEM_PROMPT
+} from './aiService'
 
-describe('AiService', () => {
+const TEST_GROQ_KEY = 'test-groq-api-key'
+
+describe('AiService (Groq)', () => {
+  const prevGroqEnv = process.env['GROQ_API_KEY']
+
+  beforeEach(() => {
+    process.env['GROQ_API_KEY'] = TEST_GROQ_KEY
+  })
+
+  afterEach(() => {
+    if (prevGroqEnv === undefined) {
+      delete process.env['GROQ_API_KEY']
+    } else {
+      process.env['GROQ_API_KEY'] = prevGroqEnv
+    }
+    vi.restoreAllMocks()
+  })
+
   describe('resolveEndpoint', () => {
-    it('resuelve el endpoint por defecto (free) hacia LLM7 de forma 100% gratuita y sin claves', () => {
-      const endpoint = AiService.resolveEndpoint({ provider: 'free' })
-      expect(endpoint.url).toBe('https://api.llm7.io/v1/chat/completions')
-      expect(endpoint.model).toBe('default')
+    it('resuelve el endpoint y clave configurada de Groq por defecto', () => {
+      const endpoint = AiService.resolveEndpoint()
+      expect(endpoint.url).toBe(GROQ_CHAT_COMPLETIONS_URL)
+      expect(endpoint.model).toBe(GROQ_DEFAULT_MODEL)
       expect(endpoint.headers['Content-Type']).toBe('application/json')
-      expect(endpoint.headers['Authorization']).toBeUndefined()
+      expect(endpoint.headers['Authorization']).toBe(`Bearer ${TEST_GROQ_KEY}`)
     })
 
-    it('resuelve el endpoint de gemini con clave y modelo por defecto', () => {
+    it('permite sobrescribir clave y modelo si se pasan en config', () => {
       const endpoint = AiService.resolveEndpoint({
-        provider: 'gemini',
-        apiKey: 'test-gemini-key'
+        apiKey: 'custom-groq-key',
+        model: 'openai/gpt-oss-20b'
       })
-      expect(endpoint.url).toContain('googleapis.com')
-      expect(endpoint.headers['Authorization']).toBe('Bearer test-gemini-key')
-      expect(endpoint.model).toBe('gemini-2.0-flash')
+      expect(endpoint.headers['Authorization']).toBe('Bearer custom-groq-key')
+      expect(endpoint.model).toBe('openai/gpt-oss-20b')
     })
 
-    it('resuelve el endpoint de groq con modelo ultra-rápido por defecto', () => {
-      const endpoint = AiService.resolveEndpoint({
-        provider: 'groq',
-        apiKey: 'test-groq-key'
-      })
-      expect(endpoint.url).toContain('api.groq.com')
-      expect(endpoint.headers['Authorization']).toBe('Bearer test-groq-key')
-      expect(endpoint.model).toBe('llama-3.3-70b-versatile')
-    })
-
-    it('resuelve el endpoint de ollama local', () => {
-      const endpoint = AiService.resolveEndpoint({
-        provider: 'ollama',
-        customUrl: 'http://localhost:11434'
-      })
-      expect(endpoint.url).toBe('http://localhost:11434/v1/chat/completions')
-      expect(endpoint.model).toBe('llama3.2')
+    it('lanza error claro si falta la clave API de Groq', () => {
+      delete process.env['GROQ_API_KEY']
+      expect(() => AiService.resolveEndpoint()).toThrow(/Falta la clave API de Groq/i)
     })
   })
 
   describe('prepareMessages', () => {
-    it('agrega el prompt pastoral si no hay mensaje de sistema', () => {
-      const prepared = AiService.prepareMessages([
-        { role: 'user', content: '¿Qué dice Juan 3:16?' }
-      ])
+    it('agrega el prompt del asistente si no hay mensaje de sistema', () => {
+      const prepared = AiService.prepareMessages([{ role: 'user', content: 'Hola Groq' }])
       expect(prepared[0]?.role).toBe('system')
-      expect(prepared[0]?.content).toBe(PASTORAL_SYSTEM_PROMPT)
-      expect(prepared[1]?.content).toBe('¿Qué dice Juan 3:16?')
+      expect(prepared[0]?.content).toBe(GROQ_SYSTEM_PROMPT)
+      expect(prepared[1]?.content).toBe('Hola Groq')
     })
 
     it('conserva el mensaje de sistema existente si ya fue provisto', () => {
@@ -56,45 +61,69 @@ describe('AiService', () => {
         { role: 'system', content: 'Instrucción previa' },
         { role: 'user', content: 'Hola' }
       ])
-      expect(prepared.length).toBe(2)
+      expect(prepared).toHaveLength(2)
       expect(prepared[0]?.content).toBe('Instrucción previa')
     })
   })
 
-  describe('generateLocalPastoralFallback', () => {
-    it('genera un bosquejo de sermón homilético ante consultas de predicación', () => {
-      const result = AiService.generateLocalPastoralFallback('Quiero un bosquejo de sermón')
-      expect(result).toContain('Bosquejo Homilético')
-      expect(result).toContain('Efesios 2:8')
-      expect(result).toContain('Conclusión')
+  describe('chat y streamChat', () => {
+    it('envía la petición a Groq y devuelve la respuesta de texto', async () => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: 'Hola desde Groq' } }]
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      )
+
+      const reply = await AiService.chat({}, [{ role: 'user', content: 'Hola' }])
+      expect(reply).toBe('Hola desde Groq')
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      const [calledUrl, calledInit] = fetchMock.mock.calls[0] ?? []
+      expect(calledUrl).toBe(GROQ_CHAT_COMPLETIONS_URL)
+      expect(calledInit?.method).toBe('POST')
+      expect((calledInit?.headers as Record<string, string>)['Authorization']).toBe(
+        `Bearer ${TEST_GROQ_KEY}`
+      )
     })
 
-    it('genera un orden de culto estructurado ante consultas de liturgia', () => {
-      const result = AiService.generateLocalPastoralFallback('Dame el orden de culto dominical')
-      expect(result).toContain('Orden de Culto Dinámico')
-      expect(result).toContain('Alabanza y Júbilo')
-      expect(result).toContain('Mensaje de la Palabra')
+    it('procesa streaming SSE emitiendo solo delta.content y omitiendo delta.reasoning', async () => {
+      const encoder = new TextEncoder()
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode(
+              'data: {"choices":[{"delta":{"reasoning":"pensando..."}}]}\n\n' +
+                'data: {"choices":[{"delta":{"content":"Hola "}}]}\n\n' +
+                'data: {"choices":[{"delta":{"content":"iglesia"}}]}\n\n' +
+                'data: [DONE]\n\n'
+            )
+          )
+          controller.close()
+        }
+      })
+
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(stream, { status: 200, headers: { 'Content-Type': 'text/event-stream' } })
+      )
+
+      const chunks: string[] = []
+      await AiService.streamChat({}, [{ role: 'user', content: 'Saluda' }], (chunk) => {
+        chunks.push(chunk)
+      })
+
+      expect(chunks.join('')).toBe('Hola iglesia')
     })
 
-    it('sugiere canciones cristianas ante consultas de alabanza', () => {
-      const result = AiService.generateLocalPastoralFallback('Sugerir alabanzas para el domingo')
-      expect(result).toContain('Repertorio de Alabanzas')
-      expect(result).toContain('Apertura y Júbilo')
-      expect(result).toContain('Hermoso Nombre')
-    })
+    it('lanza error claro si Groq responde HTTP 401', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ error: { message: 'Invalid API Key' } }), { status: 401 })
+      )
 
-    it('redacta una oración pastoral ante peticiones de oración', () => {
-      const result = AiService.generateLocalPastoralFallback('Escribe una oración pastoral')
-      expect(result).toContain('Oración Pastoral')
-      expect(result).toContain('Padre Celestial')
-      expect(result).toContain('Amén y Amén')
-    })
-
-    it('proporciona palabras de fe y aliento bíblico para cualquier otra consulta', () => {
-      const result = AiService.generateLocalPastoralFallback('palabra de Dios para hoy')
-      expect(result).toContain('Palabra Pastoral de Fe y Aliento')
-      expect(result).toContain('Isaías 41:10')
-      expect(result).toContain('Salmos 23:1')
+      await expect(AiService.chat({}, [{ role: 'user', content: 'Hola' }])).rejects.toThrow(
+        /Clave API de Groq/i
+      )
     })
   })
 })

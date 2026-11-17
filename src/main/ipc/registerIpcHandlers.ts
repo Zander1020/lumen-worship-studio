@@ -88,19 +88,19 @@ export function registerIpcHandlers(ctx: IpcContext): () => void {
 
   handle(IpcChannels.statusGet, mainAndProjection, (payload) => {
     assertNoPayload(payload)
-    return ctx.store.get()
+    return ctx.store.peek()
   })
 
   handle(IpcChannels.projectionOpen, onlyMain, async (payload) => {
     const request = parseProjectionOpenRequest(payload)
     await ctx.projection.open(request.target)
-    return ctx.store.get()
+    return ctx.store.peek()
   })
 
   handle(IpcChannels.projectionClose, mainAndProjection, async (payload) => {
     assertNoPayload(payload)
     await ctx.projection.close()
-    return ctx.store.get()
+    return ctx.store.peek()
   })
 
   handle(IpcChannels.projectionLoadDeck, onlyMain, async (payload) => {
@@ -122,19 +122,19 @@ export function registerIpcHandlers(ctx: IpcContext): () => void {
       const target = ctx.workspace.getSettings().defaultProjectionTarget
       await ctx.projection.open(target)
     }
-    return ctx.store.get()
+    return ctx.store.peek()
   })
 
   handle(IpcChannels.projectionGoToSlide, onlyMain, (payload) => {
     const request = parseProjectionGoToSlideRequest(payload)
     ctx.store.goToSlide(request)
-    return ctx.store.get()
+    return ctx.store.peek()
   })
 
   handle(IpcChannels.projectionSetMode, onlyMain, (payload) => {
     const request = parseProjectionSetModeRequest(payload)
     ctx.store.setMode(request.mode)
-    return ctx.store.get()
+    return ctx.store.peek()
   })
 
   handle(IpcChannels.projectionUpdateTheme, onlyMain, (payload) => {
@@ -142,7 +142,7 @@ export function registerIpcHandlers(ctx: IpcContext): () => void {
     ctx.store.updateTheme(patch)
     const nextTheme = ctx.store.getLiveTheme()
     ctx.workspace.updateSettings({ theme: nextTheme })
-    return ctx.store.get()
+    return ctx.store.peek()
   })
 
   // --- Canciones ---
@@ -372,7 +372,7 @@ export function registerIpcHandlers(ctx: IpcContext): () => void {
     return ctx.remote.regeneratePin()
   })
 
-  // --- Asistente inteligente local ---
+  // --- Asistente inteligente local y Chat Groq ---
 
   handle(IpcChannels.aiSuggestForTheme, onlyMain, (payload) => {
     const theme = parseRawString(payload, 'theme', 200)
@@ -380,22 +380,9 @@ export function registerIpcHandlers(ctx: IpcContext): () => void {
   })
 
   handle(IpcChannels.aiChat, onlyMain, async (payload) => {
-    if (!Array.isArray(payload)) throw new ValidationError('Payload inválido.')
-    const messages = payload
-      .filter((m): m is { role: string; content: string } => !!m && typeof m === 'object' && typeof (m as { content?: unknown }).content === 'string' && typeof (m as { role?: unknown }).role === 'string')
-      .map((m) => ({ role: m.role as AiChatMessage['role'], content: m.content.slice(0, 8000) }))
-      .filter((m): m is AiChatMessage => ['user', 'assistant', 'system'].includes(m.role))
+    const messages = parseAiMessagesPayload(payload)
     if (messages.length === 0) throw new ValidationError('Sin mensajes.')
-    const settings = ctx.workspace.getSettings()
-    return await AiService.chat(
-      {
-        provider: settings.aiProvider,
-        apiKey: settings.aiApiKey,
-        model: settings.aiModel,
-        customUrl: settings.aiCustomUrl
-      },
-      messages
-    )
+    return await AiService.chat({}, messages)
   })
 
   // --- Configuración ---
@@ -462,11 +449,7 @@ export function registerIpcHandlers(ctx: IpcContext): () => void {
     if (!payload || typeof payload !== 'object') throw new ValidationError('Payload inválido.')
     const obj = payload as { messages?: unknown; requestId?: unknown }
     const requestId = typeof obj.requestId === 'string' ? obj.requestId : String(Date.now())
-    if (!Array.isArray(obj.messages)) throw new ValidationError('Payload inválido.')
-    const messages = obj.messages
-      .filter((m): m is { role: string; content: string } => !!m && typeof m === 'object' && typeof (m as { content?: unknown }).content === 'string' && typeof (m as { role?: unknown }).role === 'string')
-      .map((m) => ({ role: m.role as AiChatMessage['role'], content: m.content.slice(0, 8000) }))
-      .filter((m): m is AiChatMessage => ['user', 'assistant', 'system'].includes(m.role))
+    const messages = parseAiMessagesPayload(obj.messages)
     if (messages.length === 0) {
       event.sender.send(IpcChannels.aiChatChunk, { requestId, chunk: '', done: true, error: 'Sin mensajes.' })
       return
@@ -476,22 +459,12 @@ export function registerIpcHandlers(ctx: IpcContext): () => void {
       event.sender.send(IpcChannels.aiChatChunk, { requestId, chunk: '', done: true, error: 'Remitente no autorizado.' })
       return
     }
-    const settings = ctx.workspace.getSettings()
     try {
-      await AiService.streamChat(
-        {
-          provider: settings.aiProvider,
-          apiKey: settings.aiApiKey,
-          model: settings.aiModel,
-          customUrl: settings.aiCustomUrl
-        },
-        messages,
-        (chunk) => {
-          if (!event.sender.isDestroyed()) {
-            event.sender.send(IpcChannels.aiChatChunk, { requestId, chunk, done: false })
-          }
+      await AiService.streamChat({}, messages, (chunk) => {
+        if (!event.sender.isDestroyed()) {
+          event.sender.send(IpcChannels.aiChatChunk, { requestId, chunk, done: false })
         }
-      )
+      })
       if (!event.sender.isDestroyed()) {
         event.sender.send(IpcChannels.aiChatChunk, { requestId, chunk: '', done: true })
       }
@@ -512,6 +485,20 @@ export function registerIpcHandlers(ctx: IpcContext): () => void {
   return () => {
     for (const channel of registered) ipcMain.removeHandler(channel)
   }
+}
+
+function parseAiMessagesPayload(raw: unknown): AiChatMessage[] {
+  if (!Array.isArray(raw)) throw new ValidationError('Payload inválido.')
+  return raw
+    .filter(
+      (m): m is { role: string; content: string } =>
+        !!m &&
+        typeof m === 'object' &&
+        typeof (m as { content?: unknown }).content === 'string' &&
+        typeof (m as { role?: unknown }).role === 'string'
+    )
+    .map((m) => ({ role: m.role as AiChatMessage['role'], content: m.content.slice(0, 12000) }))
+    .filter((m): m is AiChatMessage => ['user', 'assistant', 'system'].includes(m.role))
 }
 
 function compact(ids: (number | null)[]): number[] {

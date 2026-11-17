@@ -143,7 +143,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showClockOnLogo: true,
   remotePort: 4319,
   remotePin: '2468',
-  aiProvider: 'free',
+  aiProvider: 'groq',
   aiApiKey: '',
   aiModel: '',
   aiCustomUrl: '',

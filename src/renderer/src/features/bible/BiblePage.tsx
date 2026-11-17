@@ -3,6 +3,7 @@ import type { BibleVersionInfo, BibleVerse } from '../../../../shared/ipc'
 import { suggestVersionName } from '../../../../shared/bibleImport'
 import { parseBibleCitation, resolveBibleCitationBook, versesToSlides } from '../../../../shared/slideHelpers'
 import { ConfirmDeleteModal } from '../../components/ConfirmDeleteModal'
+import { QuickBibleModal, type QuickBibleResult } from './QuickBibleModal'
 import type { UseAppStatus } from '../../hooks/useAppStatus'
 
 export interface BiblePageProps {
@@ -92,6 +93,9 @@ export function BiblePage({ app }: BiblePageProps) {
   const [versionToDelete, setVersionToDelete] = useState<BibleVersionInfo | null>(null)
 
   const [chapterVerses, setChapterVerses] = useState<BibleVerse[]>([])
+  const [quickModalOpen, setQuickModalOpen] = useState(false)
+  const [quickModalSeed, setQuickModalSeed] = useState('')
+  const pendingActiveVerseRef = useRef<number | null>(null)
 
   // Conservar la vista mientras la pestaña siga viva en la app: al volver
   // desde Inicio/Medios se retoma el libro, capítulo, versículo y búsqueda.
@@ -153,7 +157,12 @@ export function BiblePage({ app }: BiblePageProps) {
         setChapterVerses(res)
         if (!queryRef.current.trim()) {
           setVerses(res)
-          setActiveVerseNum(null)
+          if (pendingActiveVerseRef.current !== null) {
+            setActiveVerseNum(pendingActiveVerseRef.current)
+            pendingActiveVerseRef.current = null
+          } else {
+            setActiveVerseNum(null)
+          }
         }
       }
     })
@@ -419,6 +428,86 @@ export function BiblePage({ app }: BiblePageProps) {
     }
   }
 
+  const openQuickBibleModal = (seed = ''): void => {
+    setQuickModalSeed(seed)
+    setQuickModalOpen(true)
+  }
+
+  // Apertura rápida estilo Holyrics: F2 / Ctrl+G o al empezar a teclear cualquier letra/número (1-3)
+  // estando en la vista de Biblia sin ningún otro campo enfocado ni otra modal abierta.
+  useEffect(() => {
+    const onCaptureKeyDown = (e: globalThis.KeyboardEvent): void => {
+      if (quickModalOpen || showImportModal || versionToDelete !== null) return
+      if (document.querySelector('[role="dialog"]')) return
+
+      if (e.key === 'F2' || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g')) {
+        e.preventDefault()
+        e.stopPropagation()
+        openQuickBibleModal('')
+        return
+      }
+
+      if (e.ctrlKey || e.altKey || e.metaKey) return
+
+      const target = e.target as HTMLElement | null
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return
+      }
+
+      if (/^[a-zA-ZáéíóúñÁÉÍÓÚÑ1-3]$/.test(e.key)) {
+        e.preventDefault()
+        e.stopPropagation()
+        openQuickBibleModal(e.key)
+      }
+    }
+
+    window.addEventListener('keydown', onCaptureKeyDown, true)
+    return () => window.removeEventListener('keydown', onCaptureKeyDown, true)
+  }, [quickModalOpen, showImportModal, versionToDelete])
+
+  const handleQuickBibleSelect = async ({
+    book,
+    chapter,
+    verse,
+    projectNow
+  }: QuickBibleResult): Promise<void> => {
+    setQuickModalOpen(false)
+    setQuickModalSeed('')
+    setQuery('')
+    pendingActiveVerseRef.current = verse
+    setSelectedBook(book)
+    setSelectedChapter(chapter)
+
+    const loaded = await app.getBibleChapter({
+      book,
+      chapter,
+      version: bibleVersion
+    })
+    setChapterVerses(loaded)
+    setVerses(loaded)
+    setActiveVerseNum(verse)
+
+    const refLabel = `${book} ${chapter}:${verse}`
+    setRecentPassages((prev) => [refLabel, ...prev.filter((r) => r !== refLabel)].slice(0, 8))
+
+    if (projectNow && loaded.length > 0) {
+      const targetIdx = loaded.findIndex((v) => v.verse === verse)
+      const effectiveIdx = targetIdx >= 0 ? targetIdx : 0
+      void app.loadProjectionDeck({
+        deckTitle: `${book} ${chapter}`,
+        slides: buildBibleSlides(loaded),
+        startIndex: effectiveIdx,
+        openWindow: true
+      })
+    }
+  }
+
   return (
     <section className="page hly-page" aria-labelledby="page-title">
       {/* Barra superior compacta de 1 sola fila para dejar toda la altura a los versículos */}
@@ -427,6 +516,16 @@ export function BiblePage({ app }: BiblePageProps) {
           <h1 id="page-title" className="hly-module-bar__title">
             Biblia
           </h1>
+          <button
+            type="button"
+            className="hly-mini-btn hly-mini-btn--primary"
+            aria-label="Ir a cita bíblica rápida"
+            title="Buscar libro, capítulo y versículo rápido con Tab (F2 o escribe cualquier letra)"
+            onClick={() => openQuickBibleModal('')}
+            style={{ whiteSpace: 'nowrap', fontWeight: 700 }}
+          >
+            ⚡ Ir a cita (F2)
+          </button>
           <input
             type="search"
             aria-label="Buscar en la Biblia"
@@ -885,6 +984,20 @@ export function BiblePage({ app }: BiblePageProps) {
           </div>
         </div>
       )}
+
+      <QuickBibleModal
+        isOpen={quickModalOpen}
+        initialBookQuery={quickModalSeed}
+        books={app.bibleBooks}
+        activeVersion={bibleVersion}
+        activeVersionLabel={activeVersionLabel}
+        getBibleChapter={getBibleChapter}
+        onSelect={(result) => void handleQuickBibleSelect(result)}
+        onClose={() => {
+          setQuickModalOpen(false)
+          setQuickModalSeed('')
+        }}
+      />
 
       <ConfirmDeleteModal
         isOpen={versionToDelete !== null}

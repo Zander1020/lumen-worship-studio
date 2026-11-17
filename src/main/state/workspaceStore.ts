@@ -1,4 +1,5 @@
 import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, unlinkSync, writeFileSync } from 'node:fs'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { parseHolyricsCatalogPayload, parseHolyricsMufl } from '../../shared/holyricsCompat'
@@ -340,6 +341,11 @@ export class WorkspaceStore {
 
   listSchedule(): ScheduleItem[] {
     return structuredClone(this.schedule)
+  }
+
+  /** Lectura directa de programación sin clonar (para serialización SSE/JSON inmediata). */
+  peekSchedule(): readonly ScheduleItem[] {
+    return this.schedule
   }
 
   addScheduleItem(input: ScheduleItemInput): ScheduleItem[] {
@@ -984,27 +990,71 @@ export class WorkspaceStore {
   }
 
   private saveTimer: ReturnType<typeof setTimeout> | null = null
+  private dirty = false
+  private writeInFlight: Promise<void> | null = null
+  private pendingRewriteAfterFlight = false
+
+  private serializeWorkspace(): string {
+    const payload: PersistedWorkspace = {
+      songs: this.songs,
+      schedule: this.schedule,
+      media: this.media,
+      settings: this.settings,
+      presentations: this.presentations
+    }
+    return JSON.stringify(payload)
+  }
 
   /**
-   * Programa un guardado coalescido. Evita reescribir todo el workspace
-   * (incluidos los base64 de medios y presentaciones) en cada tick de un
-   * slider de tema, lo que bloqueaba el proceso principal.
+   * Programa un guardado coalescido y asíncrono. Evita reescribir todo el
+   * workspace de forma bloqueante en el hilo principal durante la operación en vivo.
    */
   private saveToDisk(): void {
     if (!this.filePath) return
+    this.dirty = true
     if (this.saveTimer) clearTimeout(this.saveTimer)
     this.saveTimer = setTimeout(() => {
       this.saveTimer = null
-      this.flushPendingSave()
+      void this.flushAsyncSave()
     }, 400)
   }
 
-  /** Escribe de inmediato cualquier guardado pendiente (al salir de la app). */
+  private async flushAsyncSave(): Promise<void> {
+    if (!this.filePath || !this.dirty) return
+    if (this.writeInFlight) {
+      this.pendingRewriteAfterFlight = true
+      return
+    }
+    const targetPath = this.filePath
+    const json = this.serializeWorkspace()
+    this.dirty = false
+    const run = (async () => {
+      try {
+        await mkdir(dirname(targetPath), { recursive: true })
+        await writeFile(targetPath, json, 'utf-8')
+      } catch (error) {
+        this.dirty = true
+        console.warn('[workspace] No se pudo guardar en disco:', error)
+      } finally {
+        this.writeInFlight = null
+        if (this.pendingRewriteAfterFlight) {
+          this.pendingRewriteAfterFlight = false
+          if (this.dirty) void this.flushAsyncSave()
+        }
+      }
+    })()
+    this.writeInFlight = run
+    await run
+  }
+
+  /** Escribe de inmediato cualquier guardado pendiente de forma síncrona (al salir de la app). */
   flush(): void {
     if (this.saveTimer) {
       clearTimeout(this.saveTimer)
       this.saveTimer = null
     }
+    if (!this.dirty) return
+    this.pendingRewriteAfterFlight = false
     this.flushPendingSave()
   }
 
@@ -1012,14 +1062,8 @@ export class WorkspaceStore {
     if (!this.filePath) return
     try {
       mkdirSync(dirname(this.filePath), { recursive: true })
-      const payload: PersistedWorkspace = {
-        songs: this.songs,
-        schedule: this.schedule,
-        media: this.media,
-        settings: this.settings,
-        presentations: this.presentations
-      }
-      writeFileSync(this.filePath, JSON.stringify(payload, null, 2), 'utf-8')
+      writeFileSync(this.filePath, this.serializeWorkspace(), 'utf-8')
+      this.dirty = false
     } catch (error) {
       console.warn('[workspace] No se pudo guardar en disco:', error)
     }

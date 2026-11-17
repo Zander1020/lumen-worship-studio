@@ -7,7 +7,8 @@ import type { BibleBookSummary, BibleVerse } from '../../../../shared/ipc'
 
 const BOOKS: BibleBookSummary[] = [
   { book: 'Génesis', abbrev: 'Gn', testament: 'AT', chapters: [1, 2, 3, 4, 5] },
-  { book: 'Salmos', abbrev: 'Sal', testament: 'AT', chapters: [1, 2, 3, 23, 24] }
+  { book: 'Salmos', abbrev: 'Sal', testament: 'AT', chapters: [1, 2, 3, 23, 24] },
+  { book: 'Juan', abbrev: 'Jn', testament: 'NT', chapters: [1, 2, 3] }
 ]
 
 const CHAPTER_VERSES: BibleVerse[] = [
@@ -33,9 +34,18 @@ function makeApp(): UseAppStatus {
     notice: null,
     busy: false,
     bridgeAvailable: true,
-    getBibleChapter: vi.fn().mockResolvedValue(CHAPTER_VERSES),
+    getBibleChapter: vi.fn().mockImplementation(({ book, chapter }: { book: string; chapter: number }) => {
+      if (book === 'Juan' && chapter === 3) {
+        return Promise.resolve([
+          { book: 'Juan', chapter: 3, verse: 1, text: 'Había un hombre de los fariseos que se llamaba Nicodemo.' },
+          { book: 'Juan', chapter: 3, verse: 16, text: 'Porque de tal manera amó Dios al mundo.' }
+        ])
+      }
+      return Promise.resolve(CHAPTER_VERSES)
+    }),
     searchBible: vi.fn().mockResolvedValue(SEARCH_RESULTS),
-    loadBibleBooks: vi.fn().mockResolvedValue(BOOKS)
+    loadBibleBooks: vi.fn().mockResolvedValue(BOOKS),
+    loadProjectionDeck: vi.fn().mockResolvedValue(undefined)
   } as unknown as UseAppStatus
 }
 
@@ -76,5 +86,54 @@ describe('BiblePage', () => {
     expect(screen.getByText(/GÉNESIS 1 \(/)).toBeInTheDocument()
     expect(screen.getByRole('list', { name: 'Libros de la Biblia' }).querySelector('.bible-book-btn--active'))
       .not.toBeNull()
+  })
+
+  it('abre la modal de cita rápida al escribir, autocompleta libro con Tab y proyecta capítulo y versículo', async () => {
+    const user = userEvent.setup()
+    const app = makeApp()
+
+    render(<BiblePage app={app} />)
+
+    // Al escribir una letra sin ningún input enfocado se abre automáticamente la modal con ese carácter
+    await user.keyboard('j')
+
+    const dialog = await screen.findByRole('dialog', { name: 'Ir a cita bíblica' })
+    const bookInput = within(dialog).getByLabelText('Libro bíblico')
+    await waitFor(() => expect(bookInput).toHaveValue('j'))
+
+    // Completar abreviatura "jn" y pulsar Tab para autocompletar "Juan" y pasar a Capítulo
+    await user.type(bookInput, 'n{Tab}')
+    expect(bookInput).toHaveValue('Juan')
+
+    const chapterInput = within(dialog).getByLabelText('Capítulo bíblico')
+    await waitFor(() => expect(chapterInput).toHaveFocus())
+
+    // Escribir capítulo 3 y pulsar Tab para pasar a Versículo
+    await user.type(chapterInput, '3{Tab}')
+    expect(chapterInput).toHaveValue('3')
+
+    const verseInput = within(dialog).getByLabelText('Versículo bíblico')
+    await waitFor(() => expect(verseInput).toHaveFocus())
+
+    // Escribir versículo 16, comprobar vista previa y pulsar Enter para proyectar
+    await user.type(verseInput, '16')
+    expect(await within(dialog).findByText(/Porque de tal manera amó Dios al mundo\./)).toBeInTheDocument()
+
+    await user.keyboard('{Enter}')
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Ir a cita bíblica' })).not.toBeInTheDocument())
+    expect(app.loadProjectionDeck).toHaveBeenCalledWith(
+      expect.objectContaining({
+        deckTitle: 'Juan 3',
+        startIndex: 1,
+        openWindow: true
+      })
+    )
+
+    // También puede abrirse mediante el botón dedicado y cerrarse con Escape
+    await user.click(screen.getByRole('button', { name: 'Ir a cita bíblica rápida' }))
+    expect(await screen.findByRole('dialog', { name: 'Ir a cita bíblica' })).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Ir a cita bíblica' })).not.toBeInTheDocument())
   })
 })

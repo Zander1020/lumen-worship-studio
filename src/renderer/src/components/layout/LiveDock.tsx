@@ -196,6 +196,7 @@ export function LiveDock({ app }: LiveDockProps) {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.defaultPrevented) return
       const target = e.target as HTMLElement | null
       if (
         target &&
@@ -679,7 +680,7 @@ export function LiveDock({ app }: LiveDockProps) {
                       }}
                       title={`Fondo: ${item.name}`}
                     >
-                      {item.kind === 'video' && <MotionVideoBackground value={item.value} playing={active} />}
+                      {item.kind === 'video' && <MotionVideoBackground value={item.value} playing={false} />}
                       {item.kind === 'video' && (
                         <span
                           style={{

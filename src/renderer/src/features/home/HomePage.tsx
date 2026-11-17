@@ -1,4 +1,4 @@
-﻿import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
+﻿import { type ChangeEvent, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import type { HolyricsImportItem, MediaBackground, PresentationSlide, Song } from '../../../../shared/ipc'
 import {
   autoSplitLongStanzas,
@@ -39,6 +39,7 @@ function stanzaTagClass(label: string): string {
 export function HomePage({ app }: HomePageProps) {
   const [activeTab, setActiveTab] = useState<QuickTab>('music')
   const [songQuery, setSongQuery] = useState('')
+  const deferredSongQuery = useDeferredValue(songQuery)
   const [selectedSongId, setSelectedSongId] = useState<string | null>(null)
   const [openSongTabIds, setOpenSongTabIds] = useState<string[]>([])
   const [openDocTabs, setOpenDocTabs] = useState<Array<{ id: string; title: string; slides: PresentationSlide[] }>>([])
@@ -316,7 +317,7 @@ export function HomePage({ app }: HomePageProps) {
   }, [])
 
   const filteredSongs = useMemo(() => {
-    const q = songQuery.trim().toLowerCase()
+    const q = deferredSongQuery.trim().toLowerCase()
     if (!q) return app.songs
     return app.songs.filter(
       (s) =>
@@ -325,7 +326,7 @@ export function HomePage({ app }: HomePageProps) {
         s.musicalKey.toLowerCase().includes(q) ||
         s.stanzas.some((st) => st.lines.some((line) => line.toLowerCase().includes(q)))
     )
-  }, [app.songs, songQuery])
+  }, [app.songs, deferredSongQuery])
 
   const selectedSong: Song | undefined = useMemo(
     () => app.songs.find((s) => s.id === selectedSongId) ?? filteredSongs[0] ?? app.songs[0],
@@ -428,10 +429,6 @@ export function HomePage({ app }: HomePageProps) {
       startIndex: 0,
       openWindow
     })
-    void app.setProjectionMode('live')
-    if (openWindow && !app.status?.projection.windowOpen) {
-      void app.openProjection({ target: 'auto' })
-    }
   }
 
   const live = app.status?.projection.live
@@ -531,10 +528,6 @@ export function HomePage({ app }: HomePageProps) {
       startIndex: index,
       ...(openWindow ? { openWindow: true } : {})
     })
-    void app.setProjectionMode('live')
-    if (openWindow && !app.status?.projection.windowOpen) {
-      void app.openProjection({ target: 'auto' })
-    }
   }
 
   const projectSongImmediately = (song: Song, openWindow = true): void => {
@@ -549,10 +542,6 @@ export function HomePage({ app }: HomePageProps) {
       startIndex: 0,
       ...(openWindow ? { openWindow: true } : {})
     })
-    void app.setProjectionMode('live')
-    if (openWindow && !app.status?.projection.windowOpen) {
-      void app.openProjection({ target: 'auto' })
-    }
   }
 
   const projectMediaImmediately = (img: MediaBackground, openWindow = true): void => {
@@ -594,10 +583,6 @@ export function HomePage({ app }: HomePageProps) {
         videoPlaying: true,
         videoMuted: false
       })
-    }
-    void app.setProjectionMode('live')
-    if (openWindow && !app.status?.projection.windowOpen) {
-      void app.openProjection({ target: 'auto' })
     }
   }
 
@@ -1294,7 +1279,7 @@ export function HomePage({ app }: HomePageProps) {
                                 ) : (
                                   <video
                                     src={`${resolveMediaVideoUrl(m.value)}#t=0.5`}
-                                    preload="metadata"
+                                    preload="none"
                                     muted
                                     playsInline
                                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}

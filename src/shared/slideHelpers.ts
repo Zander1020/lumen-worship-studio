@@ -465,6 +465,62 @@ export function resolveBibleCitationBook(
   return contains?.book
 }
 
+function normalizeBookSearchKey(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .replace(/\s+/g, '')
+}
+
+/**
+ * Filtra y ordena libros bíblicos por relevancia para el autocompletado rápido estilo Holyrics.
+ * Soporta abreviaturas comunes (ej. "jn", "1co", "gn", "ap"), prefijos sin tildes y coincidencias parciales.
+ */
+export function filterBibleBooksByQuery<T extends { book: string; abbrev?: string }>(
+  query: string,
+  availableBooks: readonly T[]
+): T[] {
+  const norm = normalizeBookSearchKey(query)
+  if (!norm) return [...availableBooks]
+
+  const exactAbbrevTarget = COMMON_BIBLE_ABBREVIATIONS[norm]?.toLowerCase()
+  const abbrevEntries = Object.entries(COMMON_BIBLE_ABBREVIATIONS)
+
+  const scored: Array<{ item: T; rank: number; order: number }> = []
+  availableBooks.forEach((item, order) => {
+    const normName = normalizeBookSearchKey(item.book)
+    const normAbbrev = item.abbrev ? normalizeBookSearchKey(item.abbrev) : ''
+
+    let rank = 99
+    if (exactAbbrevTarget && item.book.toLowerCase() === exactAbbrevTarget) {
+      rank = 0
+    } else if (normName === norm || (normAbbrev && normAbbrev === norm)) {
+      rank = 1
+    } else if (normName.startsWith(norm)) {
+      rank = 2
+    } else if (normAbbrev && normAbbrev.startsWith(norm)) {
+      rank = 3
+    } else if (
+      abbrevEntries.some(
+        ([abbr, target]) => abbr.startsWith(norm) && target.toLowerCase() === item.book.toLowerCase()
+      )
+    ) {
+      rank = 4
+    } else if (normName.includes(norm)) {
+      rank = 5
+    }
+
+    if (rank < 99) {
+      scored.push({ item, rank, order })
+    }
+  })
+
+  scored.sort((a, b) => a.rank - b.rank || a.order - b.order)
+  return scored.map((entry) => entry.item)
+}
+
 /**
  * Convierte uno o varios versículos bíblicos en diapositivas listas para proyectar.
  * Si `splitLongVerses` es `true`, divide automáticamente los versículos muy extensos en partes A/B (Mejora 24).

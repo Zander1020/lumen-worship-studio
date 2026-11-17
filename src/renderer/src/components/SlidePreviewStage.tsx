@@ -482,13 +482,22 @@ export function SlidePreviewStage({
     new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   )
 
+  const needsClock = Boolean(
+    theme.showOverlayClock ||
+      theme.stageViewMode ||
+      (mode === 'logo' && showClockOnLogo) ||
+      mode === 'test-pattern' ||
+      theme.countdownEndIso
+  )
+
   useEffect(() => {
-    const timer = setInterval(() => {
+    if (!needsClock) return
+    const updateTime = (): void => {
       setLocalClock(
         new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
       )
-      if (live.theme.countdownEndIso) {
-        const diffMs = new Date(live.theme.countdownEndIso).getTime() - Date.now()
+      if (theme.countdownEndIso) {
+        const diffMs = new Date(theme.countdownEndIso).getTime() - Date.now()
         if (diffMs <= 0) {
           setCountdownText('00:00')
         } else {
@@ -500,9 +509,11 @@ export function SlidePreviewStage({
       } else {
         setCountdownText(null)
       }
-    }, 1000)
+    }
+    updateTime()
+    const timer = setInterval(updateTime, 1000)
     return () => clearInterval(timer)
-  }, [live.theme.countdownEndIso])
+  }, [needsClock, theme.countdownEndIso])
 
   const activeClock = clock ?? localClock
   const slideVideoRef = useRef<HTMLVideoElement | null>(null)
@@ -622,6 +633,7 @@ export function SlidePreviewStage({
     const stage = stageRef.current
     const body = bodyRef.current
     if (!stage || !body) return
+    if (currentSlide?.imageUrl && !slideLinesKey) return
 
     const stageRect = stage.getBoundingClientRect()
     const stageW = stageRect.width
@@ -685,6 +697,7 @@ export function SlidePreviewStage({
     if (headerEl) headerEl.style.textShadow = 'none'
 
     for (let step = 0; step < 10; step++) {
+      if (low > high) break
       const mid = Math.floor((low + high) / 2)
       body.style.fontSize = `${mid}px`
 
@@ -725,6 +738,7 @@ export function SlidePreviewStage({
     setMeasuredFontSizePx((prev) => (prev === targetPx ? prev : targetPx))
   }, [
     currentSlide?.id,
+    currentSlide?.imageUrl,
     slideLinesKey,
     currentSlide?.sourceKind,
     currentSlide?.sourceTitle,
@@ -1144,7 +1158,7 @@ export function SlidePreviewStage({
             position: 'absolute',
             inset: 0,
             background: `rgba(0,0,0,${dimmerAlpha.toFixed(2)})`,
-            backdropFilter: theme.bgBlur ? `blur(${theme.bgBlur}px)` : undefined,
+            backdropFilter: !isVideoBg && theme.bgBlur ? `blur(${theme.bgBlur}px)` : undefined,
             zIndex: 0
           }}
         />
@@ -1247,16 +1261,18 @@ export function SlidePreviewStage({
           <div
             className="slide-stage__bible-header"
             style={{
-              fontSize: compact ? '10px' : 'clamp(18px, 2.2vw, 36px)',
+              fontSize: compact ? '13px' : 'clamp(24px, 3.6vw, 64px)',
               fontWeight: 900,
               color: '#facc15',
               textTransform: 'uppercase',
               letterSpacing: '0.06em',
-              marginBottom: compact ? '2px' : '0.8vh',
+              marginBottom: compact ? '3px' : '1.4vh',
               textShadow: '0 2px 10px rgba(0,0,0,0.95)',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '6px'
+              maxWidth: '100%',
+              flexWrap: 'wrap',
+              gap: compact ? '4px' : '10px'
             }}
           >
             <span>📖 {currentSlide.sourceTitle || currentSlide.label}</span>

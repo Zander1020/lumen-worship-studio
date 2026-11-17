@@ -10,4 +10,7 @@ test-results/
 Thumbs.db
 *.xmm
 *.bib
+.env
+.env.local
+.env.*.local
 

@@ -8,6 +8,20 @@ export interface ChangelogRelease {
 
 export const APP_CHANGELOG: ChangelogRelease[] = [
   {
+    version: '0.1.18',
+    date: '17 de Noviembre de 2026',
+    title: 'Búsqueda Rápida Bíblica estilo Holyrics, Rendimiento Extremo y Cita Grande',
+    tagline: 'Encuentra y proyecta pasajes bíblicos en segundos con autocompletado y Tab, proyección con cita más grande, rendimiento optimizado para PCs modestos e IA con Groq.',
+    highlights: [
+      '⚡ Modal de Cita Bíblica Rápida estilo Holyrics: pulsa F2, el botón "Ir a cita" o empieza a escribir en la vista de Biblia para autocompletar libros (jn, 1co, sal, gn), saltar con Tab o clic a capítulo y versículo, ver la vista previa en vivo y proyectar con Enter.',
+      '📖 Cita Bíblica Más Grande en Proyección: encabezado superior rediseñado con escala fluida adaptativa (hasta 64px en Full HD) y auto-ajuste inteligente para proyectores 4:3, 16:9 y 4K sin cortar el texto.',
+      '🚀 Arranque Instantáneo y Fluidez en PCs de Bajos Recursos: carga perezosa de Biblias bajo demanda (LRU), eliminación de flags GPU inestables, guardado asíncrono no bloqueante y cero re-renders ociosos de relojes.',
+      '🎬 Gráficos y Vídeo Optimizados: supresión de doble desenfoque GPU en fondos de vídeo, miniaturas en reposo (0% CPU) y carga diferida de decodificadores multimedia.',
+      '📱 Control Remoto y Navegación Instantánea: estado zero-copy en IPC/SSE y cambio de diapositivas inmediato sin bloqueos de interfaz.',
+      '🤖 Chat de Inteligencia Artificial con Groq: integración directa de alta velocidad con streaming en tiempo real.'
+    ]
+  },
+  {
     version: '0.1.17',
     date: '3 de Noviembre de 2026',
     title: 'IA Pastoral 100% Gratuita e Integrada Out-of-the-Box',

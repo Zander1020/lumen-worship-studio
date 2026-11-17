@@ -105,6 +105,11 @@ export class StatusStore {
     return structuredClone(this.status)
   }
 
+  /** Lectura directa sin clonar (solo para respuestas IPC que Electron ya serializa). */
+  peek(): AppStatus {
+    return this.status
+  }
+
   /** Devuelve solo el tema en vivo: evita clonar el deck completo (imágenes en base64) para leer unos campos. */
   getLiveTheme(): ProjectionTheme {
     return structuredClone(this.status.projection.live.theme)

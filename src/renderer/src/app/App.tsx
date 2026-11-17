@@ -17,6 +17,7 @@ export function App() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.defaultPrevented) return
       if (e.key === 'Escape') {
         if (app.status?.projection.windowOpen) {
           void app.closeProjection()

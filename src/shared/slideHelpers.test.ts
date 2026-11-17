@@ -4,6 +4,7 @@ import {
   autoSplitLongStanzas,
   cleanInternetLyrics,
   createAnnouncementSlide,
+  filterBibleBooksByQuery,
   fuzzyMatchScore,
   parseRawLyricsToStanzas,
   songToSlides,
@@ -94,6 +95,26 @@ describe('songToSlides y versesToSlides', () => {
 
     expect(transposeChordText('G D Em C', 2)).toBe('A E F#m D')
     expect(fuzzyMatchScore('Sublime Gracia del Señor', 'sublme senor')).toBeGreaterThan(30)
+  })
+})
+
+describe('filterBibleBooksByQuery', () => {
+  const sampleBooks = [
+    { book: 'Génesis', abbrev: 'Gn' },
+    { book: 'Salmos', abbrev: 'Sal' },
+    { book: '1 Crónicas', abbrev: '1Cr' },
+    { book: 'Juan', abbrev: 'Jn' },
+    { book: '1 Corintios', abbrev: '1Co' },
+    { book: '1 Juan', abbrev: '1Jn' },
+    { book: 'Apocalipsis', abbrev: 'Ap' }
+  ]
+
+  it('prioriza abreviaturas exactas y prefijos sin tildes', () => {
+    expect(filterBibleBooksByQuery('jn', sampleBooks)[0]?.book).toBe('Juan')
+    expect(filterBibleBooksByQuery('1co', sampleBooks)[0]?.book).toBe('1 Corintios')
+    expect(filterBibleBooksByQuery('gen', sampleBooks)[0]?.book).toBe('Génesis')
+    expect(filterBibleBooksByQuery('ap', sampleBooks)[0]?.book).toBe('Apocalipsis')
+    expect(filterBibleBooksByQuery('sal', sampleBooks)[0]?.book).toBe('Salmos')
   })
 })
 

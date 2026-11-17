@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import type { BibleBookSummary, BibleVersionInfo, BibleVersionImportRequest, BibleVerse } from '../../shared/models'
 import { parseBibleContent } from '../../shared/bibleImport'
 import { DEFAULT_BIBLE_VERSES } from './defaultSeeds'
@@ -28,7 +28,8 @@ function normalizeText(text: string): string {
     .trim()
 }
 
-let cachedBooks: IndexedBook[] | null = null
+let fallbackBooksCache: IndexedBook[] | null = null
+let cachedDataDir: string | null = null
 
 const BUILTIN_DATA_FILES: Record<string, string> = {
   rvr1960: 'es_rvr.json',
@@ -41,7 +42,35 @@ const BUILTIN_DATA_FILES: Record<string, string> = {
   pdt: 'es_pdt.json'
 }
 
+const MAX_CACHED_VERSIONS = 2
+
+function getLruCacheEntry<T>(cache: Map<string, T>, key: string): T | undefined {
+  const hit = cache.get(key)
+  if (!hit) return undefined
+  // Mover al final para mantener orden LRU
+  cache.delete(key)
+  cache.set(key, hit)
+  return hit
+}
+
+function setLruCacheEntry<T>(cache: Map<string, T>, key: string, value: T, limit = MAX_CACHED_VERSIONS): void {
+  if (cache.has(key)) {
+    cache.delete(key)
+  } else if (cache.size >= limit) {
+    const oldestKey = cache.keys().next().value
+    if (oldestKey !== undefined) {
+      cache.delete(oldestKey)
+    }
+  }
+  cache.set(key, value)
+}
+
 function locateDataJson(fileName: string): string | null {
+  if (!fileName) return null
+  if (cachedDataDir) {
+    const direct = join(cachedDataDir, fileName)
+    if (existsSync(direct)) return direct
+  }
   const candidates: string[] = [
     join(__dirname, fileName),
     join(__dirname, '../data', fileName),
@@ -52,14 +81,18 @@ function locateDataJson(fileName: string): string | null {
     candidates.unshift(join(process.resourcesPath, fileName))
   }
   for (const candidate of candidates) {
-    if (existsSync(candidate)) return candidate
+    if (existsSync(candidate)) {
+      cachedDataDir = dirname(candidate)
+      return candidate
+    }
   }
   return null
 }
 
 function loadIndexedFromFile(path: string): IndexedBook[] | null {
   try {
-    const raw = readFileSync(path, 'utf-8').replace(/^\uFEFF/, '')
+    const content = readFileSync(path, 'utf-8')
+    const raw = content.charCodeAt(0) === 0xfeff ? content.slice(1) : content
     const parsed = JSON.parse(raw) as RawBibleBook[]
     if (!Array.isArray(parsed) || parsed.length === 0) return null
     return parsed.map((b, idx) => ({
@@ -79,13 +112,26 @@ function loadIndexedFromFile(path: string): IndexedBook[] | null {
 const dataBooksCache = new Map<string, IndexedBook[]>()
 
 function getDataBooks(fileName: string): IndexedBook[] | null {
-  const cached = dataBooksCache.get(fileName)
+  if (!fileName) return null
+  const cached = getLruCacheEntry(dataBooksCache, fileName)
   if (cached) return cached
   const path = locateDataJson(fileName)
   if (!path) return null
   const books = loadIndexedFromFile(path)
-  if (books) dataBooksCache.set(fileName, books)
+  if (books) setLruCacheEntry(dataBooksCache, fileName, books)
   return books
+}
+
+/** Devuelve las claves actualmente en caché (solo para pruebas de carga perezosa/LRU). */
+export function getLoadedBuiltinBibleCacheKeys(): string[] {
+  return [...dataBooksCache.keys()]
+}
+
+/** Limpia la caché en memoria de Biblias integradas (útil en pruebas unitarias). */
+export function clearBuiltinBibleCache(): void {
+  dataBooksCache.clear()
+  fallbackBooksCache = null
+  cachedDataDir = null
 }
 
 function buildFallbackBooks(): IndexedBook[] {
@@ -128,10 +174,10 @@ function buildFallbackBooks(): IndexedBook[] {
 }
 
 function getIndexedBooks(): IndexedBook[] {
-  if (cachedBooks) return cachedBooks
   const books = getDataBooks('es_rvr.json')
-  cachedBooks = books ?? buildFallbackBooks()
-  return cachedBooks
+  if (books) return books
+  fallbackBooksCache ??= buildFallbackBooks()
+  return fallbackBooksCache
 }
 
 function findMatchingBook(bookQuery: string, books: readonly IndexedBook[]): IndexedBook | undefined {
@@ -236,15 +282,22 @@ export class BibleRepository {
 
   listVersions(): BibleVersionInfo[] {
     const manifest = this.readManifest()
+    const importedIds = new Set(manifest.map((e) => e.id))
     return [
       ...BUILTIN_BIBLE_VERSIONS.map((v) => {
         const dataFile = BUILTIN_DATA_FILES[v.id]
-        const hasData = dataFile ? getDataBooks(dataFile) !== null : false
-        return { ...v, available: hasData || manifest.some((e) => e.id === v.id) }
+        // Solo comprueba presencia en disco para no leer ni parsear ~33 MB de JSON al listar versiones.
+        const hasData = dataFile ? locateDataJson(dataFile) !== null : false
+        return { ...v, available: hasData || importedIds.has(v.id) }
       }),
       ...manifest
         .filter((e) => !BUILTIN_BIBLE_VERSIONS.some((v) => v.id === e.id))
-        .map((e) => ({ id: e.id, name: e.name, builtIn: false, available: true }))
+        .map((e) => ({
+          id: e.id,
+          name: e.name,
+          builtIn: false,
+          available: this.bibleDir ? existsSync(join(this.bibleDir, e.fileName)) : false
+        }))
     ]
   }
 
@@ -330,29 +383,14 @@ export class BibleRepository {
   }
 
   private getStoredBooks(entry: StoredVersionEntry): IndexedBook[] | null {
-    const cached = this.versionBooksCache.get(entry.id)
+    const cached = getLruCacheEntry(this.versionBooksCache, entry.id)
     if (cached) return cached
     if (!this.bibleDir) return null
-    try {
-      const filePath = join(this.bibleDir, entry.fileName)
-      if (!existsSync(filePath)) return null
-      const raw = readFileSync(filePath, 'utf-8').replace(/^\uFEFF/, '')
-      const parsed = JSON.parse(raw) as RawBibleBook[]
-      if (!Array.isArray(parsed) || parsed.length === 0) return null
-      const books = parsed.map((b, idx): IndexedBook => ({
-        index: idx,
-        abbrev: b.abbrev,
-        normAbbrev: normalizeText(b.abbrev),
-        name: b.name,
-        normName: normalizeText(b.name),
-        testament: idx < 39 ? 'AT' : 'NT',
-        chapters: b.chapters
-      }))
-      this.versionBooksCache.set(entry.id, books)
-      return books
-    } catch {
-      return null
-    }
+    const filePath = join(this.bibleDir, entry.fileName)
+    if (!existsSync(filePath)) return null
+    const books = loadIndexedFromFile(filePath)
+    if (books) setLruCacheEntry(this.versionBooksCache, entry.id, books)
+    return books
   }
 
   /** Resuelve qué libros, etiqueta y disponibilidad usar según la versión pedida. */

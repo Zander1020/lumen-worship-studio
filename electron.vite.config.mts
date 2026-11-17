@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineConfig } from 'electron-vite'
 import react from '@vitejs/plugin-react'
@@ -9,8 +9,32 @@ delete process.env['ELECTRON_RUN_AS_NODE']
 
 const root = import.meta.dirname
 
+function readLocalEnvValue(key: string): string {
+  const fromEnv = process.env[key]?.trim()
+  if (fromEnv) return fromEnv
+  const envPath = resolve(root, '.env')
+  if (!existsSync(envPath)) return ''
+  const lines = readFileSync(envPath, 'utf-8').split(/\r?\n/)
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const eq = trimmed.indexOf('=')
+    if (eq <= 0) continue
+    if (trimmed.slice(0, eq).trim() === key) {
+      return trimmed
+        .slice(eq + 1)
+        .trim()
+        .replace(/^["']|["']$/g, '')
+    }
+  }
+  return ''
+}
+
 export default defineConfig({
   main: {
+    define: {
+      __LUMEN_BUILD_GROQ_API_KEY__: JSON.stringify(readLocalEnvValue('GROQ_API_KEY'))
+    },
     plugins: [
       {
         name: 'copy-bible-json',

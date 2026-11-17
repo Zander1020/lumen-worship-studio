@@ -110,9 +110,10 @@ export class RemoteControlServer {
     this.server = srv
 
     this.unsubscribeStore = this.statusStore.subscribe((status) => {
+      if (this.sseClients.size === 0) return
       const payload = JSON.stringify({
         projection: status.projection,
-        schedule: this.workspace.listSchedule()
+        schedule: this.workspace.peekSchedule()
       })
       for (const client of this.sseClients) {
         try {
@@ -211,7 +212,7 @@ export class RemoteControlServer {
   }
 
   private ensureActiveBackground(): void {
-    const curTheme = this.statusStore.get().projection.live.theme
+    const curTheme = this.statusStore.peek().projection.live.theme
     // Solo corregir si el fondo actual era un medio del culto (categoría 'Culto' o id 'culto-')
     if (curTheme.background.category === 'Culto' || curTheme.background.id.startsWith('culto-')) {
       const savedBg = this.workspace.getSettings().theme.background
@@ -380,8 +381,8 @@ export class RemoteControlServer {
       res.end(
         JSON.stringify({
           ok: true,
-          projection: this.statusStore.get().projection,
-          schedule: this.workspace.listSchedule()
+          projection: this.statusStore.peek().projection,
+          schedule: this.workspace.peekSchedule()
         })
       )
       return
@@ -484,8 +485,8 @@ export class RemoteControlServer {
       res.write('retry: 1000\n\n')
       res.write(
         `data: ${JSON.stringify({
-          projection: this.statusStore.get().projection,
-          schedule: this.workspace.listSchedule()
+          projection: this.statusStore.peek().projection,
+          schedule: this.workspace.peekSchedule()
         })}\n\n`
       )
       this.sseClients.add(res)
@@ -508,7 +509,7 @@ export class RemoteControlServer {
           const parsed = JSON.parse(body) as Record<string, unknown>
           const action = parsed['action']
           if (action === 'toggle-projection') {
-            const isCurrentlyOpen = this.statusStore.get().projection.windowOpen
+            const isCurrentlyOpen = this.statusStore.peek().projection.windowOpen
             if (isCurrentlyOpen) {
               void this.closeProjectionWindow?.()
             } else {
@@ -531,7 +532,7 @@ export class RemoteControlServer {
           ) {
             this.statusStore.setMode(parsed['mode'] as ProjectionDisplayMode)
           } else if (action === 'toggle-freeze' || action === 'freeze') {
-            const currentFrozen = this.statusStore.get().projection.live.theme.frozen
+            const currentFrozen = this.statusStore.peek().projection.live.theme.frozen
             this.statusStore.updateTheme({ frozen: !currentFrozen })
           } else if (action === 'project-media' && typeof parsed['mediaId'] === 'string') {
             const media = this.workspace.listMedia().find((m) => m.id === parsed['mediaId'])
@@ -565,7 +566,7 @@ export class RemoteControlServer {
               videoSeekTrigger: now
             })
           } else if (action === 'video-toggle-play') {
-            const curPlaying = this.statusStore.get().projection.live.theme.videoPlaying !== false
+            const curPlaying = this.statusStore.peek().projection.live.theme.videoPlaying !== false
             this.statusStore.updateTheme({ videoPlaying: !curPlaying })
           } else if (action === 'video-play') {
             this.statusStore.updateTheme({ videoPlaying: true })
@@ -579,10 +580,10 @@ export class RemoteControlServer {
               videoSeekTrigger: now
             })
           } else if (action === 'video-toggle-mute') {
-            const curMuted = Boolean(this.statusStore.get().projection.live.theme.videoMuted)
+            const curMuted = Boolean(this.statusStore.peek().projection.live.theme.videoMuted)
             this.statusStore.updateTheme({ videoMuted: !curMuted })
           } else if (action === 'video-toggle-fit') {
-            const curFit = this.statusStore.get().projection.live.theme.mediaFit
+            const curFit = this.statusStore.peek().projection.live.theme.mediaFit
             const nextFit = curFit === 'fill' || curFit === 'cover' ? 'contain' : 'fill'
             this.statusStore.updateTheme({ mediaFit: nextFit })
           } else if (action === 'media-stop') {
@@ -600,7 +601,7 @@ export class RemoteControlServer {
               })
             }
           } else if (action === 'adjust-font-scale' && typeof parsed['delta'] === 'number') {
-            const curScale = this.statusStore.get().projection.live.theme.fontScale
+            const curScale = this.statusStore.peek().projection.live.theme.fontScale
             const nextScale = Math.max(50, Math.min(200, curScale + parsed['delta']))
             this.statusStore.updateTheme({ fontScale: nextScale })
           } else if (action === 'set-ticker' && typeof parsed['text'] === 'string') {
@@ -722,7 +723,7 @@ export class RemoteControlServer {
             'Content-Type': 'application/json; charset=utf-8',
             ...noCacheHeaders
           })
-          res.end(JSON.stringify({ ok: true, projection: this.statusStore.get().projection }))
+          res.end(JSON.stringify({ ok: true, projection: this.statusStore.peek().projection }))
         } catch {
           res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' })
           res.end(JSON.stringify({ ok: false, error: 'Solicitud mal formada.' }))

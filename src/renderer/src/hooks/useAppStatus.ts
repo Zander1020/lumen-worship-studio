@@ -189,6 +189,15 @@ export function useAppStatus(): UseAppStatus {
     }
   }, [])
 
+  const runLiveAction = useCallback(async (action: () => Promise<AppStatus>) => {
+    try {
+      const next = await action()
+      setStatus(next)
+    } catch (err: unknown) {
+      setError(messageOf(err))
+    }
+  }, [])
+
   const openProjection = useCallback(
     async (request?: ProjectionOpenRequest) => {
       if (api) await runStatus(() => api.openProjection(request))
@@ -204,61 +213,40 @@ export function useAppStatus(): UseAppStatus {
     async (request: ProjectionLoadDeckRequest) => {
       if (api && typeof api.loadProjectionDeck === 'function') {
         await runStatus(async () => {
-          if (status?.projection.live.theme.frozen && typeof api.updateProjectionTheme === 'function') {
-            await api.updateProjectionTheme({ frozen: false })
-          }
-          let next = await api.loadProjectionDeck({
-            deckTitle: request.deckTitle,
-            slides: request.slides,
-            ...(request.startIndex !== undefined ? { startIndex: request.startIndex } : {})
-          })
-          if (
-            next.projection.live.mode !== 'live' &&
-            typeof api.setProjectionMode === 'function'
-          ) {
-            next = await api.setProjectionMode({ mode: 'live' })
-          }
-          if (
-            request.openWindow &&
-            !next.projection.windowOpen &&
-            typeof api.openProjection === 'function'
-          ) {
-            next = await api.openProjection({ target: 'auto' })
-          }
-          return next
+          return await api.loadProjectionDeck(request)
         })
         setNotice(`Proyectando: ${request.deckTitle}`)
       }
     },
-    [api, runStatus, status?.projection.live.theme.frozen]
+    [api, runStatus]
   )
 
   const goToSlide = useCallback(
     async (request: ProjectionGoToSlideRequest) => {
       if (api && typeof api.goToSlide === 'function') {
-        await runStatus(() => api.goToSlide(request))
+        await runLiveAction(() => api.goToSlide(request))
       }
     },
-    [api, runStatus]
+    [api, runLiveAction]
   )
 
   const setProjectionMode = useCallback(
     async (mode: ProjectionDisplayMode) => {
       if (api && typeof api.setProjectionMode === 'function') {
-        await runStatus(() => api.setProjectionMode({ mode }))
+        await runLiveAction(() => api.setProjectionMode({ mode }))
       }
     },
-    [api, runStatus]
+    [api, runLiveAction]
   )
 
   const updateProjectionTheme = useCallback(
     async (patch: Partial<ProjectionTheme>) => {
       if (api && typeof api.updateProjectionTheme === 'function') {
-        await runStatus(() => api.updateProjectionTheme(patch))
+        await runLiveAction(() => api.updateProjectionTheme(patch))
         setNotice('Tema de proyección actualizado.')
       }
     },
-    [api, runStatus]
+    [api, runLiveAction]
   )
 
   const upsertSong = useCallback(

@@ -1,6 +1,6 @@
 # ESTADO ACTUAL Y MEMORIA DEL PROYECTO: LUMEN STUDIO
-**Fecha de corte:** 3 de Noviembre de 2026  
-**Última versión en desarrollo:** `v0.1.17` (previa publicada: `v0.1.16`)
+**Fecha de corte:** 17 de Noviembre de 2026  
+**Última versión en desarrollo:** `v0.1.18` (previa publicada: `v0.1.17`)
 **Repositorio GitHub:** [https://github.com/Zander1020/lumen-worship-studio](https://github.com/Zander1020/lumen-worship-studio)  
 **Release activo:** `v0.1.14` (incluye `latest.yml`, `Lumen-Studio-Setup-0.1.14.exe` y `Lumen-Studio-Setup-0.1.14.exe.blockmap`)  
 **Rama principal:** `main` (al día con `origin/main` y tags `v0.1.8`, `v0.1.9`, `v0.1.10`, `v0.1.11`, `v0.1.12` y `v0.1.13`)
@@ -141,3 +141,27 @@
   - Badge visual en verde `🟢 100% Gratis` con indicación `IA Gratuita Integrada (Automática)`.
   - Botón de ajustes renombrado a `⚙️ Opciones avanzadas` para usuarios que opcionalmente deseen conectar sus propias claves (Gemini, Groq, etc.), dejando claro que la app ya funciona al 100% sin tocar nada.
 - **Barra Superior Limpia:** Se mantiene la cabecera libre de formularios de búsqueda bíblica innecesarios, enfocada en la navegación y control de la liturgia.
+
+
+### v0.1.18 — Búsqueda Bíblica Rápida estilo Holyrics, Rendimiento Integral y Cita Grande
+- **Modal de Cita Bíblica Rápida estilo Holyrics (`QuickBibleModal.tsx`):**
+  - Apertura mediante botón `⚡ Ir a cita (F2)`, atajo `F2` / `Ctrl+G`, o automáticamente al empezar a escribir cualquier letra o `1`/`2`/`3` estando en la vista de Biblia.
+  - Autocompletado predictivo de libros (`filterBibleBooksByQuery` en `slideHelpers.ts`) con soporte para abreviaturas (`jn`, `1co`, `sal`, `gn`, `ap`), navegación encadenada `Libro → Capítulo → Versículo` con `Tab`, `:`, `Espacio` o clic, cuadrículas rápidas y vista previa instantánea del versículo antes de proyectar con `Enter`.
+  - Protección de cabina: `Esc` cierra únicamente la modal sin cerrar la proyección en vivo y se coordinó `LiveDock` para evitar disparos accidentales de `B`/`C`/`L`/`F`.
+- **Cita Bíblica Grande y Adaptativa en Proyección:**
+  - El encabezado superior `.slide-stage__bible-header` ahora se proyecta con escala fluida `clamp(24px, 3.6vw, 64px)` (casi el doble del límite anterior de 36px) con `flexWrap: 'wrap'` y soporte adaptable para proyectores 4:3 (1024x768), laptops 1366x768, pantallas 1080p y monitores 4K.
+  - El algoritmo de auto-ajuste de 10 pasos en el DOM (`SlidePreviewStage.tsx`) calcula automáticamente el espacio ocupado por el encabezado en cada pantalla y ajusta el tamaño óptimo del versículo para evitar desbordes y cortes.
+- **Aceleración y Fluidez en Computadores de Gama Baja/Media:**
+  - *Carga perezosa de Biblias (Lazy Loading):* Se eliminó la lectura sincrónica de ~33 MB de JSON al arrancar; las versiones se cargan bajo demanda con caché LRU acotada a 2 versiones.
+  - *Eliminación de banderas GPU riesgosas:* Se limpiaron flags como `ignore-gpu-blocklist` y `enable-zero-copy` que provocaban caídas y cuellos de botella en drivers gráficos integrados de Intel.
+  - *Estado Zero-Copy en IPC y Control Remoto:* Se sustituyeron llamadas `statusStore.get()` por `statusStore.peek()`, evitando clonar objetos gigantescos del estado en cada evento o petición móvil.
+  - *Persistencia Asíncrona del Workspace:* El guardado de `lumen-workspace.json` ahora es no bloqueante (`node:fs/promises`) con serialización compacta y dirty tracking.
+  - *Supresión de doble desenfoque GPU:* En fondos de vídeo, se desactiva `backdropFilter: blur` redundante cuando el vídeo ya incluye su filtro acelerado nativamente.
+  - *Miniaturas multimedia en reposo:* La cuadrícula de fondos en `LiveDock` utiliza `playing={false}` para congelar un solo fotograma y no consumir CPU en bucles de canvas.
+  - *Timers de reloj condicionales:* Se eliminó la ejecución ininterrumpida de `setInterval(1000)` en proyección; solo se ejecuta cuando hay relojes o cuentas atrás visibles.
+  - *Transiciones instantáneas en vivo:* `goToSlide`, `setProjectionMode` y `updateProjectionTheme` se procesan con `runLiveAction`, eliminando bloqueos de `isBusy` global.
+  - *Búsqueda con `useDeferredValue`:* La búsqueda en catálogos de canciones en `HomePage` y `SongsPage` no bloquea el hilo de renderizado al teclear.
+  - *Control de decodificadores de vídeo:* `preload="none"` en listas de medios para no agotar la memoria gráfica de hardware.
+- **Integración con Groq AI:**
+  - Integración directa con la API key de Groq utilizando el modelo ultra veloz `openai/gpt-oss-120b` con streaming en tiempo real.
+- **Verificación:** `npm run check` en verde (TypeScript Node/Web 0 errores, ESLint 0 errores/warnings, 81/81 pruebas unitarias pasando).
